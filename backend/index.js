@@ -10,7 +10,7 @@ const { HoldingsModel } = require("./model/HoldingsModel");
 const { PositionsModel } = require("./model/PositionsModel");
 
 const { OrdersModel } = require("./model/OrdersModel");
-const { getStockQuote, searchStocks } = require("./services/finnhub");
+const { getStockQuote, searchStocks, getStockFundamentals, getStockFinancials } = require("./services/finnhub");
 const { getIntradayChart } = require("./services/alphaVantage");
 const { getStockData } = require("./services/twelveData");
 const { getTopGainers, getTopLosers, getMostActive } = require("./services/fmp");
@@ -416,6 +416,42 @@ app.get("/search", async (req, res) => {
   }
 });
 
+
+app.get("/stock-fundamentals/:symbol", async (req, res) => {
+  try {
+    const { symbol } = req.params;
+
+    const data = await getStockFundamentals(symbol);
+
+    if (!data) {
+      return res.status(404).json({ error: "Fundamentals not found" });
+    }
+
+    res.json(data);
+
+  } catch (error) {
+    console.error("Fundamentals API error:", error.message);
+    res.status(500).json({ error: "Failed to fetch fundamentals" });
+  }
+});
+
+app.get("/stock-financials/:symbol", async (req, res) => {
+  try {
+    const { symbol } = req.params;
+
+    const data = await getStockFinancials(symbol);
+
+    if (!data) {
+      return res.status(404).json({ error: "Financials not found" });
+    }
+
+    res.json(data);
+
+  } catch (error) {
+    console.error("Financials API error:", error.message);
+    res.status(500).json({ error: "Failed to fetch financials" });
+  }
+});
 
 app.listen(PORT, () => {
   console.log("App started!");

@@ -36,6 +36,7 @@ import {
     ArrowDownRight,
 } from "lucide-react";
 
+const API = import.meta.env.VITE_API_URL;
 
 export default function StockDashboard() {
     const navigate = useNavigate();
@@ -149,9 +150,9 @@ export default function StockDashboard() {
     const totalPLPercent = (totalPL / totalInvested) * 100;
     const fetchExploreData = async () => {
         try {
-            const gainersRes = await axios.get("http://localhost:3002/explore/gainers");
-            const losersRes = await axios.get("http://localhost:3002/explore/losers");
-            const activeRes = await axios.get("http://localhost:3002/explore/most-active");
+            const gainersRes = await axios.get(`${API}/explore/gainers`);
+            const losersRes = await axios.get(`${API}/explore/losers`);
+            const activeRes = await axios.get(`${API}/explore/most-active`);
             setGainers(gainersRes.data);
             setLosers(losersRes.data);
             setActiveStocks(activeRes.data);
@@ -165,7 +166,7 @@ export default function StockDashboard() {
     // 1️⃣ Define a reusable function
     const fetchAllStocks = async (symbols) => {
         try {
-            const res = await axios.get(`http://localhost:3002/stocks?symbols=${symbols.join(",")}`);
+            const res = await axios.get(`${API}/stocks?symbols=${symbols.join(",")}`);
             setStocks(prev => {
                 const updatedStocks = prev.filter(s => !symbols.includes(s.symbol));
                 return [...updatedStocks, ...res.data];

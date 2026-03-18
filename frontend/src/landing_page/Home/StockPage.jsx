@@ -19,7 +19,9 @@ import {
     Newspaper,
     LineChart as LineChartIcon,
 } from "lucide-react";
-import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
+
+const API = import.meta.env.VITE_API_URL;
 
 const TIME_PERIODS = ["1D", "1W", "1M", "1Y", "3Y", "5Y"];
 
@@ -87,67 +89,124 @@ export function StockPage() {
 
     // ── Data State ────────────────────────────────────────────────────────────
     const [stockData, setStockData] = useState(MOCK_STOCK);
+    const [financials, setFinancials] = useState(null);
+    const [fundamentals, setfundamentals] = useState(null);
     const [chartData, setChartData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    const key = financials?.keyFinancials;
+    const income = financials?.incomeStatement;
+
+    const fetchStock = async () => {
+        try {
+            const res = await fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            if (data.error) throw new Error(data.error);
+
+            return data;
+        } catch (err) {
+            console.error("Stock error:", err);
+            return null;
+        }
+    };
+
+    const fetchFundamentals = async () => {
+        try {
+            const res = await fetch(`${API}/stock-fundamentals/${symbol}`);
+            const data = await res.json();
+            return data;
+        } catch (err) {
+            console.error("Fundamentals error:", err);
+            return null;
+        }
+    };
+
+    const fetchFinancials = async () => {
+        try {
+            const res = await fetch(`${API}/stock-financials/${symbol}`);
+            const data = await res.json();
+            return data;
+        } catch (err) {
+            console.error("Financials error:", err);
+            return null;
+        }
+    };
+
     useEffect(() => {
         if (!symbol) return;
 
-        const fetchStock = async () => {
+        const loadData = async () => {
             setLoading(true);
             setError(null);
-            try {
-                const res = await fetch(`http://localhost:3002/stock/${symbol}?period=${selectedPeriod}`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
 
-                if (data.error) throw new Error(data.error);
+
+            try {
+                const stock = await fetchStock();
+                const fundamentals = await fetchFundamentals();
+                const financials = await fetchFinancials();   // ✅ NEW
+
+                if (!stock) throw new Error("Stock fetch failed");
 
                 setStockData({
-                    symbol: data.symbol || symbol.toUpperCase(),
-                    name: data.name || "",
+                    symbol: stock.symbol || symbol.toUpperCase(),
+                    name: stock.name || "",
 
-                    price: data.price ?? MOCK_STOCK.price,
-                    change: data.change ?? MOCK_STOCK.change,
+                    price: stock.price ?? MOCK_STOCK.price,
+                    change: stock.change ?? MOCK_STOCK.change,
+                    changePercent: stock.changePercent ?? MOCK_STOCK.changePercent,
 
-                    // 🔥 FIXED
-                    changePercent: data.changePercent ?? MOCK_STOCK.changePercent,
+                    open: stock.open ?? MOCK_STOCK.open,
+                    high: stock.high ?? MOCK_STOCK.high,
+                    low: stock.low ?? MOCK_STOCK.low,
+                    prevClose: stock.prevClose ?? MOCK_STOCK.prevClose,
 
-                    open: data.open ?? MOCK_STOCK.open,
-                    high: data.high ?? MOCK_STOCK.high,
-                    low: data.low ?? MOCK_STOCK.low,
+                    volume: stock.volume ?? MOCK_STOCK.volume,
 
-                    // 🔥 FIXED
-                    prevClose: data.prevClose ?? MOCK_STOCK.prevClose,
+                    // ✅ fundamentals
+                    marketCap: fundamentals?.marketCap ?? MOCK_STOCK.marketCap,
+                    pe: fundamentals?.pe ?? MOCK_STOCK.pe,
+                    pb: fundamentals?.pb ?? MOCK_STOCK.pb,
+                    divYield: fundamentals?.dividendYield ?? MOCK_STOCK.divYield,
+                    eps: fundamentals?.eps ?? 0,
+                    roe: fundamentals?.roe ?? 0,
+                    avgVolume: fundamentals?.avgVolume ?? 0,
 
-                    volume: data.volume ?? MOCK_STOCK.volume,
+                    high52w: fundamentals?.high52w ?? stock.fiftyTwoWeek?.high ?? MOCK_STOCK.high52w,
+                    low52w: fundamentals?.low52w ?? stock.fiftyTwoWeek?.low ?? MOCK_STOCK.low52w,
 
-                    // (optional, backend not sending these yet)
-                    marketCap: data.marketCap ?? MOCK_STOCK.marketCap,
-                    pe: data.pe ?? MOCK_STOCK.pe,
-                    pb: data.pb ?? MOCK_STOCK.pb,
-                    divYield: data.divYield ?? MOCK_STOCK.divYield,
-
-                    high52w: data.fiftyTwoWeek?.high ?? MOCK_STOCK.high52w,
-                    low52w: data.fiftyTwoWeek?.low ?? MOCK_STOCK.low52w,
-
-                    exchange: data.exchange ?? MOCK_STOCK.exchange,
-                    changes: data.changes ?? {},
+                    exchange: stock.exchange ?? MOCK_STOCK.exchange,
+                    changes: stock.changes
                 });
 
-                setChartData(Array.isArray(data.chart) && data.chart.length > 0 ? data.chart : []);
+                setChartData(Array.isArray(stock.chart) ? stock.chart : []);
+
+                // ✅ SET FINANCIALS SEPARATELY
+                setFinancials(financials);
+
             } catch (err) {
-                console.warn("API unavailable, using mock data:", err.message);
-                setError("Using demo data — connect your API at localhost:3002");
-                setStockData({ ...MOCK_STOCK, symbol: symbol.toUpperCase() });
+                console.warn("Fallback to mock:", err.message);
+
+                setError("Using demo data — backend not running");
+
+                setStockData({
+                    ...MOCK_STOCK,
+                    symbol: symbol.toUpperCase()
+                });
+
                 setChartData([]);
+                setFinancials(null); // ✅ reset
+
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchStock();
+
+        loadData();
+
     }, [symbol, selectedPeriod]);
 
     // ── Derived values ────────────────────────────────────────────────────────
@@ -161,7 +220,21 @@ export function StockPage() {
         if (!active || !payload?.length) return null;
         const point = payload[0].payload;
         const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-        const label = selectedPeriod === "1D" ? `${today}, ${point.time}` : point.time;
+        const date = new Date(point.time);
+
+        const label =
+            selectedPeriod === "1D"
+                ? date.toLocaleString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }) // 17 Mar, 10:30 AM
+                : date.toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "2-digit",
+                }); // 17 Mar 26
         return (
             <div className="bg-[#1e2532] border border-white/10 rounded shadow-2xl px-3 py-2">
                 <p className="text-white font-semibold text-lg">${payload[0].value.toFixed(2)}</p>
@@ -244,10 +317,10 @@ export function StockPage() {
                         <div className="flex justify-between items-end pb-4">
                             <div>
                                 <div className="flex items-center gap-3 mb-1">
-                                    <h1 className="text-3xl font-semibold tracking-tight">{stockData.symbol}</h1>
+                                    <h1 className="text-3xl font-semibold tracking-tight">{stockData.name}</h1>
                                     <span className="text-xs font-medium px-2 py-0.5 bg-white/5 text-gray-400 rounded">{stockData.exchange}</span>
                                 </div>
-                                <p className="text-sm text-gray-400">{stockData.name}</p>
+                                <p className="text-sm text-gray-400">{stockData.symbol}</p>
                             </div>
                             <div className="text-right flex flex-col items-end">
                                 <div className="text-3xl font-semibold tracking-tight">${Number(stockData.price).toFixed(2)}</div>
@@ -278,15 +351,26 @@ export function StockPage() {
                                                     <stop offset="95%" stopColor={themeColor} stopOpacity={0} />
                                                 </linearGradient>
                                             </defs>
+
+                                            {/* 🔥 ADD THIS */}
+                                            <YAxis
+                                                domain={[
+                                                    (dataMin) => dataMin * 0.998,
+                                                    (dataMax) => dataMax * 1.002,
+                                                ]}
+                                                hide
+                                            />
+
                                             <Area
                                                 type="monotone"
                                                 dataKey="price"
                                                 stroke={themeColor}
-                                                strokeWidth={2}
+                                                strokeWidth={2.5}   // 🔥 slightly thicker
                                                 fill="url(#colorPrice)"
                                                 isAnimationActive={true}
                                                 animationDuration={800}
                                             />
+
                                             <Tooltip
                                                 content={<CustomTooltip />}
                                                 cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1, strokeDasharray: "4 4" }}
@@ -391,11 +475,11 @@ export function StockPage() {
                                         {/* Period returns */}
                                         <div className="grid grid-cols-5 gap-3 mt-4">
                                             {[
-                                                { label: "Today", value: `${isPositive ? "+" : ""}${Number(stockData.changes?.[selectedPeriod]?.percent).toFixed(2)}%`, pos: isPositive },
-                                                { label: "1 Week", value: "+2.45%", pos: true },
-                                                { label: "1 Month", value: "+5.67%", pos: true },
-                                                { label: "1 Year", value: "+23.45%", pos: true },
-                                                { label: "3 Years", value: "+78.92%", pos: true },
+                                                { label: "1 Week", value: `${Number(stockData.changes["1W"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["1W"].percent).toFixed(2)}%`, pos: Number(stockData.changes["1W"].percent) >= 0 },
+                                                { label: "1 Month", value: `${Number(stockData.changes["1M"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["1M"].percent).toFixed(2)}%`, pos: Number(stockData.changes["1M"].percent) >= 0 },
+                                                { label: "1 Year", value: `${Number(stockData.changes["1Y"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["1Y"].percent).toFixed(2)}%`, pos: Number(stockData.changes["1Y"].percent) >= 0 },
+                                                { label: "3 Years", value: `${Number(stockData.changes["3Y"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["3Y"].percent).toFixed(2)}%`, pos: Number(stockData.changes["3Y"].percent) >= 0 },
+                                                { label: "5 Years", value: `${Number(stockData.changes["5Y"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["5Y"].percent).toFixed(2)}%`, pos: Number(stockData.changes["5Y"].percent) >= 0 },
                                             ].map(({ label, value, pos }) => (
                                                 <div key={label} className="bg-[#1a2130]/30 p-3 rounded-lg text-center">
                                                     <div className="text-gray-500 text-xs mb-1">{label}</div>
@@ -604,10 +688,26 @@ export function StockPage() {
                                         <h3 className="text-base font-semibold mb-4">Key Financials (TTM)</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                             {[
-                                                { label: "Revenue", value: "$8.2L Cr", yoy: "+12.5%" },
-                                                { label: "Net Profit", value: "$68,450 Cr", yoy: "+15.2%" },
-                                                { label: "EPS", value: "86.32", yoy: "+14.8%" },
-                                                { label: "ROE", value: "18.5%", yoy: "+2.1%" },
+                                                {
+                                                    label: "Revenue",
+                                                    value: key?.revenue ? formatNumber(key.revenue) : "--",
+                                                    yoy: key?.revenueGrowth ? `${key.revenueGrowth}%` : "--"
+                                                },
+                                                {
+                                                    label: "Net Profit",
+                                                    value: key?.netProfit ? formatNumber(key.netProfit) : "--",
+                                                    yoy: key?.profitGrowth ? `${key.profitGrowth}%` : "--"
+                                                },
+                                                {
+                                                    label: "EPS",
+                                                    value: stockData.eps || "--",
+                                                    yoy: "--"
+                                                },
+                                                {
+                                                    label: "ROE",
+                                                    value: stockData.roe ? `${stockData.roe}%` : "--",
+                                                    yoy: "--"
+                                                }
                                             ].map(({ label, value, yoy }) => (
                                                 <div key={label} className="bg-[#1a2130]/50 p-4 rounded-lg">
                                                     <div className="text-gray-500 mb-1 text-xs">{label}</div>

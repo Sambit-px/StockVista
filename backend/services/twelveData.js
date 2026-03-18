@@ -112,6 +112,7 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
             symbol: quote.symbol,
             name: quote.name,
             price: nowPrice,
+            exchange: quote.exchange,
 
             open: +quote.open || 0,
             high: +quote.high || 0,

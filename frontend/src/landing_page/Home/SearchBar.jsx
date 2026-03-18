@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
+const API = import.meta.env.VITE_API_URL;
+
 export default function SearchBar({ onSelect }) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
@@ -14,7 +16,7 @@ export default function SearchBar({ onSelect }) {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const res = await axios.get("http://localhost:3002/search", {
+                const res = await axios.get(`${API}/search`, {
                     params: { q: query },
                 });
                 setResults(res.data.slice(0, 5)); // top 5

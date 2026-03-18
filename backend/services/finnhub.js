@@ -50,4 +50,109 @@ async function searchStocks(query) {
         return [];
     }
 }
-module.exports = { searchStocks, getStockQuote };
+
+async function getStockFundamentals(symbol) {
+    try {
+        const response = await axios.get("https://finnhub.io/api/v1/stock/metric", {
+            params: {
+                symbol,
+                metric: "all",
+                token: FINNHUB_API_KEY
+            }
+        });
+
+        const metric = response.data.metric || {};
+
+        return {
+            marketCap: metric.marketCapitalization || 0,
+
+            // ✅ FIXED
+            pe: metric.peTTM || 0,
+            pb: metric.pb || 0,
+            dividendYield: metric.currentDividendYieldTTM || 0,
+
+            eps: metric.epsTTM || 0,
+            roe: metric.roeTTM || 0,
+
+            high52w: metric["52WeekHigh"] || 0,
+            low52w: metric["52WeekLow"] || 0,
+            avgVolume: metric["10DayAverageTradingVolume"] || 0,
+
+            industryPe: null
+        };
+
+    } catch (error) {
+        console.error("Finnhub fundamentals error:", error.message);
+        return null;
+    }
+}
+
+async function getStockFinancials(symbol) {
+    try {
+        const res = await axios.get("https://finnhub.io/api/v1/stock/financials-reported", {
+            params: { symbol, token: FINNHUB_API_KEY }
+        });
+
+        const data = res.data.data || [];
+        if (!data.length) return null;
+
+        const latest = data[0];
+        const prev = data[1];
+
+        const findValue = (obj, key) => obj?.[key] ?? 0;
+
+        // Annual income statement
+        const incomeStatement = data.slice(0, 3).map(year => ({
+            year: year.year,
+            revenue: findValue(year.report.ic, "Revenue"),
+            expenses: findValue(year.report.ic, "Operating Expenses"),
+            operatingProfit: findValue(year.report.ic, "Operating Income"),
+            netProfit: findValue(year.report.ic, "Net Income")
+        }));
+
+        // Quarterly data (filter by quarter > 0)
+        const quarterly = data.filter(d => d.quarter > 0).slice(0, 4).map(q => ({
+            quarter: `Q${q.quarter} ${q.year}`,
+            revenue: findValue(q.report.ic, "Revenue"),
+            profit: findValue(q.report.ic, "Net Income"),
+            eps: findValue(q.report.ic, "EPS")
+        }));
+
+        // Ratios example (PE, PB, ROE, etc.)
+        const ratios = [
+            { label: "PE Ratio", value: findValue(latest.report.ic, "Price to Earnings") || "--" },
+            { label: "PB Ratio", value: findValue(latest.report.ic, "Price to Book") || "--" },
+            { label: "ROE", value: findValue(latest.report.ic, "Return on Equity") || "--" },
+            { label: "Dividend Yield", value: findValue(latest.report.ic, "Dividend Yield") || "--" }
+        ];
+
+        // Key metrics
+        const latestRevenue = findValue(latest.report.ic, "Revenue");
+        const prevRevenue = findValue(prev?.report.ic, "Revenue");
+        const latestProfit = findValue(latest.report.ic, "Net Income");
+        const prevProfit = findValue(prev?.report.ic, "Net Income");
+
+        const revenueGrowth = prevRevenue ? ((latestRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+        const profitGrowth = prevProfit ? ((latestProfit - prevProfit) / prevProfit) * 100 : 0;
+
+        return {
+            keyFinancials: {
+                revenue: latestRevenue,
+                revenueGrowth: +revenueGrowth.toFixed(2),
+                netProfit: latestProfit,
+                profitGrowth: +profitGrowth.toFixed(2),
+            },
+            income: incomeStatement,
+            quarterly,
+            ratios,
+            balanceSheet: latest.report.bs,
+            cashFlow: latest.report.cf
+        };
+
+    } catch (error) {
+        console.error("Financials error:", error.message);
+        return null;
+    }
+}
+
+module.exports = { searchStocks, getStockQuote, getStockFundamentals, getStockFinancials };
