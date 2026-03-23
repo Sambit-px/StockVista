@@ -13,6 +13,7 @@ import StockDashboard from "./StockDashboard";
 import FNODashboard from "./FNODashboard";
 import MutualFundsDashboard from "./MutualFundsDashboard";
 import StockPage from "./StockPage";
+import LoginPage from "./LoginPage";
 
 function Homepage() {
     return (
@@ -31,6 +32,7 @@ function Homepage() {
                     </div>
                 }
             />
+            <Route path='/auth' element={<LoginPage />} />
             <Route path='/home' element={<Home />} />
             <Route path='/stocks' element={<StockDashboard />} />
             <Route path='/fno' element={<FNODashboard />} />

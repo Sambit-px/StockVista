@@ -38,6 +38,44 @@ import {
 
 const API = import.meta.env.VITE_API_URL;
 
+const buyStock = async ({ symbol, quantity, price }) => {
+    try {
+        const res = await axios.post(`${API}/orders/buy`, {
+            symbol,
+            quantity,
+            price
+        });
+
+        console.log("Buy success:", res.data);
+
+        // refresh holdings or orders if needed
+        // fetchOrders();
+        // fetchHoldings();
+
+    } catch (err) {
+        console.error("Buy failed:", err.response?.data || err.message);
+    }
+};
+
+const sellStock = async ({ symbol, quantity, price }) => {
+    try {
+        const res = await axios.post(`${API}/orders/sell`, {
+            symbol,
+            quantity,
+            price
+        });
+
+        console.log("Sell success:", res.data);
+
+        // refresh
+        // fetchOrders();
+        // fetchHoldings();
+
+    } catch (err) {
+        console.error("Sell failed:", err.response?.data || err.message);
+    }
+};
+
 export default function StockDashboard() {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState("explore");
@@ -45,88 +83,12 @@ export default function StockDashboard() {
     const [losers, setLosers] = useState([]);
     const [activeStocks, setActiveStocks] = useState([]);
     const [stocks, setStocks] = useState([]);
+    const [holdings, setHoldings] = useState([]);
+    const [watchlistStocks, setWatchlistStocks] = useState([]);
+    const [orders, setOrders] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
     const [openMenu, setOpenMenu] = useState(null);
     const [hoverRow, setHoverRow] = useState(null);
-
-    const exploreStocks = {
-        trending: [
-            { symbol: "ADANIENT", name: "Adani Enterprises", price: 2847.50, change: 6.8, volume: "2.8M" },
-            { symbol: "TATASTEEL", name: "Tata Steel", price: 145.30, change: 4.2, volume: "5.1M" },
-            { symbol: "WIPRO", name: "Wipro Ltd", price: 445.60, change: 3.5, volume: "1.9M" },
-            { symbol: "AXISBANK", name: "Axis Bank", price: 1156.80, change: 2.9, volume: "3.2M" },
-        ],
-        topGainers: [
-            { symbol: "TITAN", name: "Titan Company", price: 3420.50, change: 8.4, volume: "980K" },
-            { symbol: "ASIANPAINT", name: "Asian Paints", price: 2845.30, change: 7.2, volume: "1.2M" },
-            { symbol: "BAJFINANCE", name: "Bajaj Finance", price: 6889.75, change: 6.5, volume: "850K" },
-        ],
-        topLosers: [
-            { symbol: "ZOMATO", name: "Zomato Ltd", price: 125.40, change: -5.8, volume: "4.5M" },
-            { symbol: "PAYTM", name: "Paytm", price: 685.90, change: -4.2, volume: "2.8M" },
-            { symbol: "NYKAA", name: "Nykaa", price: 168.50, change: -3.6, volume: "1.5M" },
-        ],
-    };
-
-    const holdings = [
-        { symbol: "AAPL", quantity: 20, avgPrice: 180 },
-        { symbol: "MSFT", quantity: 10, avgPrice: 400 },
-        { symbol: "NVDA", quantity: 5, avgPrice: 820 },
-        { symbol: "TSLA", quantity: 15, avgPrice: 170 }
-    ];
-
-    // Watchlist symbols
-    const watchlistStocks = [
-        { symbol: "AAPL" },
-        { symbol: "TSLA" },
-        { symbol: "MSFT" },
-        { symbol: "NVDA" },
-        { symbol: "AMZN" },
-        { symbol: "META" },
-        { symbol: "GOOGL" },
-        { symbol: "NFLX" },
-        { symbol: "AMD" },
-        { symbol: "INTC" }
-    ];
-
-    const orders = [
-        {
-            id: "ORD001",
-            symbol: "RELIANCE",
-            type: "BUY",
-            quantity: 50,
-            price: 2515.30,
-            status: "Executed",
-            time: "10:30 AM",
-        },
-        {
-            id: "ORD002",
-            symbol: "TCS",
-            type: "SELL",
-            quantity: 25,
-            price: 3860.00,
-            status: "Pending",
-            time: "11:15 AM",
-        },
-        {
-            id: "ORD003",
-            symbol: "HDFCBANK",
-            type: "BUY",
-            quantity: 100,
-            price: 1599.25,
-            status: "Executed",
-            time: "09:45 AM",
-        },
-        {
-            id: "ORD004",
-            symbol: "INFY",
-            type: "SELL",
-            quantity: 75,
-            price: 1465.00,
-            status: "Cancelled",
-            time: "12:30 PM",
-        },
-    ];
 
     const items = [
         { icon: <Compass size={30} strokeWidth={1.2} />, label: 'Explore', onClick: () => setActiveTab("explore"), },
@@ -160,17 +122,48 @@ export default function StockDashboard() {
             console.error("Explore fetch error:", err);
         }
     };
+    //Buy handler
+    const handleBuy = async (stock) => {
+        try {
+            await axios.post(`${API}/stock/${stock.symbol}/buy`, {
+                quantity: 1,         // default 1 share
+                price: stock.price,  // current stock price
+            });
+            console.log("Buy order placed for", stock.symbol);
+
+            // Refresh the stock data after buying
+            fetchAllStocks([stock.symbol]);
+        } catch (err) {
+            console.error("Buy order failed:", err.response?.data || err.message);
+        }
+    };
+
+    //Sell handler
+    const handleSell = async (stock) => {
+        try {
+            await axios.post(`${API}/stock/${stock.symbol}/sell`, {
+                quantity: 1,         // default 1 share
+                price: stock.price,  // current stock price
+            });
+            console.log("Sell order placed for", stock.symbol);
+
+            // Refresh the stock data after selling
+            fetchAllStocks([stock.symbol]);
+        } catch (err) {
+            console.error("Sell order failed:", err.response?.data || err.message);
+        }
+    };
 
 
-
-    // 1️⃣ Define a reusable function
+    // Define a reusable function
     const fetchAllStocks = async (symbols) => {
         try {
             const res = await axios.get(`${API}/stocks?symbols=${symbols.join(",")}`);
-            setStocks(prev => {
-                const updatedStocks = prev.filter(s => !symbols.includes(s.symbol));
-                return [...updatedStocks, ...res.data];
-            });
+
+            setHoldings(res.data.holdings || []);
+            setWatchlistStocks(res.data.watchlist || []);
+            setOrders(res.data.orders || []);
+
             console.log("Stocks updated:", res.data);
         } catch (err) {
             console.error("Failed to fetch stocks:", err.response?.status, err.message);
@@ -190,7 +183,8 @@ export default function StockDashboard() {
         const interval = setInterval(() => fetchAllStocks(allSymbols), 180000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [holdings, watchlistStocks]);
+
     useEffect(() => {
         fetchExploreData(); // FMP gainers/losers/active
 
@@ -605,8 +599,9 @@ export default function StockDashboard() {
                                                                                     whileTap={{ scale: 0.95 }}
                                                                                     transition={{ type: "tween", ease: "easeInOut", duration: 0.2 }}
                                                                                     className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/50 rounded"
+                                                                                    onClick={() => handleBuy(stock)}
                                                                                 >
-                                                                                    <HiListBullet className="stroke-[1.4]" /> View Details
+                                                                                    <HiListBullet className="stroke-[1.4]" /> Buy
                                                                                 </motion.button>
                                                                             </MenuItem>
 
@@ -616,8 +611,9 @@ export default function StockDashboard() {
                                                                                     whileTap={{ scale: 0.95 }}
                                                                                     transition={{ type: "tween", ease: "easeInOut", duration: 0.2 }}
                                                                                     className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/50 rounded"
+                                                                                    onClick={() => handleSell(stock)}
                                                                                 >
-                                                                                    <FontAwesomeIcon icon={faPen} /> Edit Order
+                                                                                    <FontAwesomeIcon icon={faPen} /> Sell
                                                                                 </motion.button>
                                                                             </MenuItem>
 
