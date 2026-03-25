@@ -98,9 +98,20 @@ export function StockPage() {
     const key = financials?.keyFinancials;
     const income = financials?.incomeStatement;
 
+    function formatNumber(num) {
+        if (!num) return "--";
+        if (num >= 1_00_00_00_000) return `$${(num / 1_00_00_00_000).toFixed(1)}L Cr`;
+        if (num >= 1_00_00_000) return `$${(num / 1_00_00_000).toFixed(1)} Cr`;
+        if (num >= 1_00_000) return `$${(num / 1_00_000).toFixed(1)}L`;
+        return `$${num.toLocaleString()}`;
+    }
+
     const fetchStock = async () => {
         try {
-            const res = await fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`);
+            const token = localStorage.getItem("accessToken");
+            const res = await fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
 
@@ -475,15 +486,37 @@ export function StockPage() {
                                         {/* Period returns */}
                                         <div className="grid grid-cols-5 gap-3 mt-4">
                                             {[
-                                                { label: "1 Week", value: `${Number(stockData.changes["1W"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["1W"].percent).toFixed(2)}%`, pos: Number(stockData.changes["1W"].percent) >= 0 },
-                                                { label: "1 Month", value: `${Number(stockData.changes["1M"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["1M"].percent).toFixed(2)}%`, pos: Number(stockData.changes["1M"].percent) >= 0 },
-                                                { label: "1 Year", value: `${Number(stockData.changes["1Y"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["1Y"].percent).toFixed(2)}%`, pos: Number(stockData.changes["1Y"].percent) >= 0 },
-                                                { label: "3 Years", value: `${Number(stockData.changes["3Y"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["3Y"].percent).toFixed(2)}%`, pos: Number(stockData.changes["3Y"].percent) >= 0 },
-                                                { label: "5 Years", value: `${Number(stockData.changes["5Y"].percent) >= 0 ? "+" : ""}${Number(stockData.changes["5Y"].percent).toFixed(2)}%`, pos: Number(stockData.changes["5Y"].percent) >= 0 },
+                                                {
+                                                    label: "1 Week",
+                                                    value: `${Number(stockData?.changes?.["1W"]?.percent ?? 0) >= 0 ? "+" : ""}${Number(stockData?.changes?.["1W"]?.percent ?? 0).toFixed(2)}%`,
+                                                    pos: Number(stockData?.changes?.["1W"]?.percent ?? 0) >= 0,
+                                                },
+                                                {
+                                                    label: "1 Month",
+                                                    value: `${Number(stockData?.changes?.["1M"]?.percent ?? 0) >= 0 ? "+" : ""}${Number(stockData?.changes?.["1M"]?.percent ?? 0).toFixed(2)}%`,
+                                                    pos: Number(stockData?.changes?.["1M"]?.percent ?? 0) >= 0,
+                                                },
+                                                {
+                                                    label: "1 Year",
+                                                    value: `${Number(stockData?.changes?.["1Y"]?.percent ?? 0) >= 0 ? "+" : ""}${Number(stockData?.changes?.["1Y"]?.percent ?? 0).toFixed(2)}%`,
+                                                    pos: Number(stockData?.changes?.["1Y"]?.percent ?? 0) >= 0,
+                                                },
+                                                {
+                                                    label: "3 Years",
+                                                    value: `${Number(stockData?.changes?.["3Y"]?.percent ?? 0) >= 0 ? "+" : ""}${Number(stockData?.changes?.["3Y"]?.percent ?? 0).toFixed(2)}%`,
+                                                    pos: Number(stockData?.changes?.["3Y"]?.percent ?? 0) >= 0,
+                                                },
+                                                {
+                                                    label: "5 Years",
+                                                    value: `${Number(stockData?.changes?.["5Y"]?.percent ?? 0) >= 0 ? "+" : ""}${Number(stockData?.changes?.["5Y"]?.percent ?? 0).toFixed(2)}%`,
+                                                    pos: Number(stockData?.changes?.["5Y"]?.percent ?? 0) >= 0,
+                                                },
                                             ].map(({ label, value, pos }) => (
                                                 <div key={label} className="bg-[#1a2130]/30 p-3 rounded-lg text-center">
                                                     <div className="text-gray-500 text-xs mb-1">{label}</div>
-                                                    <div className={`font-semibold text-sm ${pos ? "text-emerald-400" : "text-red-400"}`}>{value}</div>
+                                                    <div className={`font-semibold text-sm ${pos ? "text-emerald-400" : "text-red-400"}`}>
+                                                        {value}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>

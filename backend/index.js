@@ -38,7 +38,7 @@ app.get("/stocks", authMiddleware, async (req, res) => {
     }
 
     // Get user data
-    const user = await UserModel.findById(req.user.id);
+    const user = await UserModel.findById(req.userId);
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -105,6 +105,8 @@ app.get("/stock/:symbol", authMiddleware, async (req, res) => {
     }
 
     const stockInfo = await getStockData(symbol, interval, period);
+    console.log("StockInfo received from service:", stockInfo);
+
 
     if (!stockInfo) {
       return res.status(404).json({ error: "Stock not found" });
@@ -256,7 +258,7 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "Invalid quantity or price" });
     }
 
-    const user = await UserModel.findById(req.user.id);
+    const user = await UserModel.findById(req.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const existingStock = user.stocks.holdings.find(
@@ -311,7 +313,7 @@ app.post("/stock/:symbol/sell", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "Invalid quantity or price" });
     }
 
-    const user = await UserModel.findById(req.user.id);
+    const user = await UserModel.findById(req.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const stock = user.stocks.holdings.find(

@@ -29,41 +29,38 @@ const generateTokens = (userId) => {
 
 router.post("/register", async (req, res) => {
     try {
+        console.log("📩 Register hit, body:", req.body); // ← add this
+
         const { name, email, password } = req.body;
+        if (!name || !email || !password) {
+            return res.status(400).json({ error: "Missing fields" });
+        }
 
         const existingUser = await UserModel.findOne({ email });
-
         if (existingUser) {
             return res.status(400).json({ error: "User already exists" });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-
-        const user = new UserModel({
-            name,
-            email,
-            password: hashedPassword
-        });
+        const user = new UserModel({ name, email, password: hashedPassword });
 
         const { accessToken, refreshToken } = generateTokens(user._id);
-
+        if (user.refreshTokens.length > 5) {
+            user.refreshTokens = user.refreshTokens.slice(-5); // keep only last 5
+        }
         user.refreshTokens.push(refreshToken);
-
         await user.save();
+
 
         res.json({
             accessToken,
             refreshToken,
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                stocks: user.stocks
-            }
+            user: { id: user._id, name: user.name, email: user.email, stocks: user.stocks }
         });
 
     } catch (error) {
-        res.status(500).json({ error: "Registration failed" });
+        console.error("❌ Register error:", error); // ← full error object
+        res.status(500).json({ error: error.message }); // ← real message to browser
     }
 });
 
@@ -86,9 +83,12 @@ router.post("/login", async (req, res) => {
 
         const { accessToken, refreshToken } = generateTokens(user._id);
 
+        if (user.refreshTokens.length > 5) {
+            user.refreshTokens = user.refreshTokens.slice(-5); // keep only last 5
+        }
         user.refreshTokens.push(refreshToken);
-
         await user.save();
+
 
         res.json({
             accessToken,

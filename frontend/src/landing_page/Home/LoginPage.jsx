@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { Routes, Route, useNavigate } from "react-router-dom";
+import Home from "./Home.jsx";
 import { ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lamp } from "../../components/Lamp";
@@ -9,6 +11,7 @@ export default function App() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [particles, setParticles] = useState([]);
   const containerRef = useRef(null);
+  const navigate = useNavigate();
 
   // Generate floating particles
   useEffect(() => {
@@ -37,6 +40,9 @@ export default function App() {
   }, []);
 
   const toggleForms = () => setIsRegister(!isRegister);
+  const handleLogin = () => {
+    navigate("/home");
+  };
 
   const fadeVariants = {
     hidden: {
@@ -79,6 +85,7 @@ export default function App() {
       </button>
 
       <Lamp isOn={isRegister} toggle={toggleForms} />
+
 
       {/* Animated Particles */}
       {particles.map((particle) => (
@@ -131,7 +138,7 @@ export default function App() {
                 exit="exit"
                 className="absolute inset-0"
               >
-                <LoginForm onSwitch={toggleForms} />
+                <LoginForm onSwitch={toggleForms} onLogin={handleLogin} />
               </motion.div>
             )}
           </AnimatePresence>

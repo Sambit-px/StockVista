@@ -158,7 +158,10 @@ export default function StockDashboard() {
     // Define a reusable function
     const fetchAllStocks = async (symbols) => {
         try {
-            const res = await axios.get(`${API}/stocks?symbols=${symbols.join(",")}`);
+            const token = localStorage.getItem("accessToken");
+            const res = await axios.get(`${API}/stocks?symbols=${symbols.join(",")}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
 
             setHoldings(res.data.holdings || []);
             setWatchlistStocks(res.data.watchlist || []);
@@ -175,6 +178,8 @@ export default function StockDashboard() {
             ...holdings.map(h => h.symbol),
             ...watchlistStocks.map(w => w.symbol)
         ])];
+
+        if (allSymbols.length === 0) return;
 
         // Initial fetch
         fetchAllStocks(allSymbols);

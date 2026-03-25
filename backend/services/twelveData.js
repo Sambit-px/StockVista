@@ -81,7 +81,16 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
 
         // ⚡ FAST CHANGE CALCULATION
         const calculateChanges = (chartData) => {
-            if (!chartData.length) return {};
+            if (!chartData.length) {
+                return {
+                    "1D": { change: 0, percent: 0 },
+                    "1W": { change: 0, percent: 0 },
+                    "1M": { change: 0, percent: 0 },
+                    "1Y": { change: 0, percent: 0 },
+                    "3Y": { change: 0, percent: 0 },
+                    "5Y": { change: 0, percent: 0 },
+                };
+            }
 
             const getIndex = (percent) =>
                 Math.max(0, Math.floor(chartData.length * percent));
