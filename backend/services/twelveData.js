@@ -1,33 +1,111 @@
 const axios = require("axios");
 const API_KEY = process.env.TWELVE_API_KEY;
 
+const MAX_POINTS = 200;
+
+// Pick the best pre-fetched series for a given period
+const PERIOD_SOURCE = {
+    "1D": "intraday",
+    "1W": "intraday",
+    "1M": "daily",
+    "1Y": "daily",
+    "3Y": "weekly",
+    "5Y": "weekly",
+};
+
+const PERIOD_DAYS = {
+    "1D": 1,
+    "1W": 7,
+    "1M": 30,
+    "1Y": 365,
+    "3Y": 365 * 3,
+    "5Y": 365 * 5,
+};
+
+// Downsample to MAX_POINTS if needed
+const downsample = (arr) => {
+    if (arr.length <= MAX_POINTS) return arr;
+    const step = Math.ceil(arr.length / MAX_POINTS);
+    return arr.filter((_, i) => i % step === 0);
+};
+
+const buildChart = (values, period) => {
+    const days = PERIOD_DAYS[period] || 1;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    const filtered = values
+        .filter(v => v.timestamp >= cutoff)
+        .sort((a, b) => a.timestamp - b.timestamp); // oldest → newest
+
+    return downsample(filtered).map(v => ({ time: v.time, price: v.price }));
+};
+
+const calculateChanges = (fullValues, nowPrice, quote) => {
+    if (!fullValues.length) {
+        return {
+            "1D": { change: 0, percent: 0 },
+            "1W": { change: 0, percent: 0 },
+            "1M": { change: 0, percent: 0 },
+            "1Y": { change: 0, percent: 0 },
+            "3Y": { change: 0, percent: 0 },
+            "5Y": { change: 0, percent: 0 },
+        };
+    }
+
+    // Sort oldest → newest with timestamps pre-parsed
+    const sorted = [...fullValues].sort((a, b) => a.timestamp - b.timestamp);
+
+    const getChange = (cutoffMs) => {
+        // Walk backwards to find last candle at or before cutoff
+        let pastPrice = nowPrice;
+        for (let i = sorted.length - 1; i >= 0; i--) {
+            if (sorted[i].timestamp <= cutoffMs) {
+                pastPrice = sorted[i].price;
+                break;
+            }
+        }
+        const change = nowPrice - pastPrice;
+        return {
+            change: +change.toFixed(2),
+            percent: +((change / pastPrice) * 100).toFixed(2),
+        };
+    };
+
+    const now = Date.now();
+
+    return {
+        // 1D: use quote directly — most accurate, handles half-days & holidays
+        "1D": {
+            change: +quote.change || 0,
+            percent: +quote.percent_change || 0,
+        },
+        "1W": getChange(now - 7 * 24 * 60 * 60 * 1000),
+        "1M": getChange(now - 30 * 24 * 60 * 60 * 1000),
+        "1Y": getChange(now - 365 * 24 * 60 * 60 * 1000),
+        "3Y": getChange(now - 3 * 365 * 24 * 60 * 60 * 1000),
+        "5Y": getChange(now - 5 * 365 * 24 * 60 * 60 * 1000),
+    };
+};
+
 async function getStockData(symbol, interval = "1min", period = "1D") {
     try {
-        // 🔥 Dynamic output size (fetch slightly more than needed)
-        const intervalOutputSizeMap = {
-            "1min": 400,
-            "5min": 600,
-            "1h": 800,
-            "1day": 1000,
-            "1week": 900,
-            "1month": 700,
-        };
-
-        const outputsize = intervalOutputSizeMap[interval] || 400;
-
-        // ⚡ Parallel API calls
-        const [quoteRes, chartRes] = await Promise.all([
+        // Fetch quote + intraday + daily (5Y) + weekly (all) in parallel
+        const [quoteRes, intradayRes, dailyRes, weeklyRes] = await Promise.all([
             axios.get("https://api.twelvedata.com/quote", {
                 params: { symbol, apikey: API_KEY },
             }),
+            // Intraday: max candles at requested interval — covers 1D & 1W charts
             axios.get("https://api.twelvedata.com/time_series", {
-                params: {
-                    symbol,
-                    interval,
-                    outputsize,
-                    apikey: API_KEY,
-                },
-            })
+                params: { symbol, interval, outputsize: 5000, apikey: API_KEY },
+            }),
+            // Daily: ~5 years of daily closes — covers 1M, 1Y charts
+            axios.get("https://api.twelvedata.com/time_series", {
+                params: { symbol, interval: "1day", outputsize: 1825, apikey: API_KEY },
+            }),
+            // Weekly: decades of data — covers 3Y, 5Y charts + all change calcs
+            axios.get("https://api.twelvedata.com/time_series", {
+                params: { symbol, interval: "1week", outputsize: 5000, apikey: API_KEY },
+            }),
         ]);
 
         const quote = quoteRes.data;
@@ -37,85 +115,59 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
             return null;
         }
 
-        if (chartRes.data.code) {
-            console.error("Chart error:", chartRes.data.message);
+        if (intradayRes.data.code) {
+            console.error("Intraday chart error:", intradayRes.data.message);
             return null;
-        }
-
-        const values = chartRes.data.values || [];
-
-        // 🔥 PERIOD FILTERING (MAIN FIX)
-        const now = new Date();
-
-        const periodDaysMap = {
-            "1D": 1,
-            "1W": 7,
-            "1M": 30,
-            "1Y": 365,
-            "3Y": 365 * 3,
-            "5Y": 365 * 5,
-        };
-
-        const days = periodDaysMap[period] || 1;
-
-        const cutoff = new Date();
-        cutoff.setDate(now.getDate() - days);
-
-        let chart = values
-            .filter(v => new Date(v.datetime) >= cutoff)
-            .map(v => ({
-                time: v.datetime,
-                price: +v.close
-            }))
-            .reverse();
-
-        // 🔥 DOWNSAMPLING (prevents too many points)
-        const MAX_POINTS = 200;
-
-        if (chart.length > MAX_POINTS) {
-            const step = Math.ceil(chart.length / MAX_POINTS);
-            chart = chart.filter((_, i) => i % step === 0);
         }
 
         const nowPrice = +quote.close || 0;
 
-        // ⚡ FAST CHANGE CALCULATION
-        const calculateChanges = (chartData) => {
-            if (!chartData.length) {
-                return {
-                    "1D": { change: 0, percent: 0 },
-                    "1W": { change: 0, percent: 0 },
-                    "1M": { change: 0, percent: 0 },
-                    "1Y": { change: 0, percent: 0 },
-                    "3Y": { change: 0, percent: 0 },
-                    "5Y": { change: 0, percent: 0 },
-                };
-            }
+        // -------- PARSE ALL SERIES (timestamps pre-parsed once) --------
+        const parseValues = (data) =>
+            (data.values || []).map(v => ({
+                time: v.datetime,
+                price: +v.close,
+                timestamp: new Date(v.datetime).getTime(),
+            }));
 
-            const getIndex = (percent) =>
-                Math.max(0, Math.floor(chartData.length * percent));
+        const intradayValues = parseValues(intradayRes.data);
+        const dailyValues = parseValues(dailyRes.data);
+        const weeklyValues = parseValues(weeklyRes.data);
 
-            const getChange = (index) => {
-                const pastPrice = chartData[index]?.price || nowPrice;
-                const change = nowPrice - pastPrice;
+        // -------- CHART DATA: pick right source per period --------
+        const source = PERIOD_SOURCE[period] || "daily";
 
-                return {
-                    change: +change.toFixed(2),
-                    percent: +((change / pastPrice) * 100).toFixed(2),
-                };
-            };
+        let chartValues;
+        if (source === "intraday") {
+            chartValues = intradayValues;
+        } else if (source === "weekly") {
+            // Blend: daily where available, weekly for older range
+            const dailyOldest = dailyValues.length
+                ? Math.min(...dailyValues.map(v => v.timestamp))
+                : Infinity;
+            chartValues = [
+                ...weeklyValues.filter(v => v.timestamp < dailyOldest),
+                ...dailyValues,
+            ];
+        } else {
+            // daily
+            chartValues = dailyValues;
+        }
 
-            return {
-                "1D": getChange(getIndex(0.98)),
-                "1W": getChange(getIndex(0.9)),
-                "1M": getChange(getIndex(0.75)),
-                "1Y": getChange(getIndex(0.5)),
-                "3Y": getChange(getIndex(0.25)),
-                "5Y": getChange(0),
-            };
-        };
+        const chart = buildChart(chartValues, period);
+        console.log(`Chart [${period}] → source:${source}, points:${chart.length}`);
 
-        const changes = calculateChanges(chart);
+        // -------- FULL VALUES FOR CHANGE CALC (weekly + daily merged) --------
+        const dailyOldest = dailyValues.length
+            ? Math.min(...dailyValues.map(v => v.timestamp))
+            : Infinity;
+
+        const fullValues = [
+            ...weeklyValues.filter(v => v.timestamp < dailyOldest),
+            ...dailyValues,
+        ];
+
+        const changes = calculateChanges(fullValues, nowPrice, quote);
 
         return {
             symbol: quote.symbol,

@@ -99,24 +99,34 @@ export function StockPage() {
     const income = financials?.incomeStatement;
 
     function formatNumber(num) {
-        if (!num) return "--";
-        if (num >= 1_00_00_00_000) return `$${(num / 1_00_00_00_000).toFixed(1)}L Cr`;
-        if (num >= 1_00_00_000) return `$${(num / 1_00_00_000).toFixed(1)} Cr`;
-        if (num >= 1_00_000) return `$${(num / 1_00_000).toFixed(1)}L`;
-        return `$${num.toLocaleString()}`;
+        const fetchFinancials = async () => {
+            try {
+                const res = await fetch(`${API}/stock-financials/${symbol}`);
+
+
+                const data = await res.json();
+                return data;
+            } catch (err) {
+                console.error("Financials error:", err);
+                return null;
+            }
+        };
     }
 
     const fetchStock = async () => {
         try {
-            const token = localStorage.getItem("accessToken");
+            const token = localStorage.getItem("accessToken"); // ← add this
             const res = await fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` } // ← add this
             });
+            if (res.status === 404) {
+                console.warn(`Stock not found for ${symbol}`);
+                return null; // fallback to mock
+            }
+
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
             const data = await res.json();
-
-            if (data.error) throw new Error(data.error);
-
             return data;
         } catch (err) {
             console.error("Stock error:", err);
@@ -126,11 +136,22 @@ export function StockPage() {
 
     const fetchFundamentals = async () => {
         try {
-            const res = await fetch(`${API}/stock-fundamentals/${symbol}`);
+            const token = localStorage.getItem("accessToken");
+            const res = await fetch(`${API}/stock-fundamentals/${symbol}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+
+            if (res.status === 404) {
+                console.warn(`Fundamentals not found for ${symbol}`);
+                return null;
+            }
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
             const data = await res.json();
             return data;
         } catch (err) {
-            console.error("Fundamentals error:", err);
+            console.error("Fundamentals fetch error:", err);
             return null;
         }
     };
@@ -138,6 +159,14 @@ export function StockPage() {
     const fetchFinancials = async () => {
         try {
             const res = await fetch(`${API}/stock-financials/${symbol}`);
+
+            if (res.status === 404) {
+                console.warn(`Financials not found for ${symbol}`);
+                return null;
+            }
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
             const data = await res.json();
             return data;
         } catch (err) {
@@ -146,79 +175,93 @@ export function StockPage() {
         }
     };
 
+    // Runs ONCE on symbol load — fetches stock data + changes + fundamentals + financials
     useEffect(() => {
         if (!symbol) return;
 
-        const loadData = async () => {
+        const loadBaseData = async () => {
             setLoading(true);
             setError(null);
-
-
             try {
-                const stock = await fetchStock();
-                const fundamentals = await fetchFundamentals();
-                const financials = await fetchFinancials();   // ✅ NEW
+                const token = localStorage.getItem("accessToken");
 
-                if (!stock) throw new Error("Stock fetch failed");
+                // Fetch stock + fundamentals + financials in parallel
+                const [stockRes, fundamentalsRes, financialsRes] = await Promise.all([
+                    fetch(`${API}/stock/${symbol}?period=1D`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }).then(r => r.json()),
+                    fetchFundamentals(),
+                    fetchFinancials()
+                ]);
 
+                if (stockRes.error) throw new Error(stockRes.error);
+
+                // Set stock data
                 setStockData({
-                    symbol: stock.symbol || symbol.toUpperCase(),
-                    name: stock.name || "",
-
-                    price: stock.price ?? MOCK_STOCK.price,
-                    change: stock.change ?? MOCK_STOCK.change,
-                    changePercent: stock.changePercent ?? MOCK_STOCK.changePercent,
-
-                    open: stock.open ?? MOCK_STOCK.open,
-                    high: stock.high ?? MOCK_STOCK.high,
-                    low: stock.low ?? MOCK_STOCK.low,
-                    prevClose: stock.prevClose ?? MOCK_STOCK.prevClose,
-
-                    volume: stock.volume ?? MOCK_STOCK.volume,
-
-                    // ✅ fundamentals
-                    marketCap: fundamentals?.marketCap ?? MOCK_STOCK.marketCap,
-                    pe: fundamentals?.pe ?? MOCK_STOCK.pe,
-                    pb: fundamentals?.pb ?? MOCK_STOCK.pb,
-                    divYield: fundamentals?.dividendYield ?? MOCK_STOCK.divYield,
-                    eps: fundamentals?.eps ?? 0,
-                    roe: fundamentals?.roe ?? 0,
-                    avgVolume: fundamentals?.avgVolume ?? 0,
-
-                    high52w: fundamentals?.high52w ?? stock.fiftyTwoWeek?.high ?? MOCK_STOCK.high52w,
-                    low52w: fundamentals?.low52w ?? stock.fiftyTwoWeek?.low ?? MOCK_STOCK.low52w,
-
-                    exchange: stock.exchange ?? MOCK_STOCK.exchange,
-                    changes: stock.changes
+                    symbol: stockRes.symbol || symbol.toUpperCase(),
+                    name: stockRes.name || "",
+                    price: stockRes.price ?? MOCK_STOCK.price,
+                    change: stockRes.change ?? MOCK_STOCK.change, // ← keep the overall change
+                    changePercent: stockRes.changePercent ?? MOCK_STOCK.changePercent,
+                    open: stockRes.open ?? MOCK_STOCK.open,
+                    high: stockRes.high ?? MOCK_STOCK.high,
+                    low: stockRes.low ?? MOCK_STOCK.low,
+                    prevClose: stockRes.prevClose ?? MOCK_STOCK.prevClose,
+                    volume: stockRes.volume ?? MOCK_STOCK.volume,
+                    marketCap: fundamentalsRes?.marketCap ?? MOCK_STOCK.marketCap,
+                    pe: fundamentalsRes?.pe ?? MOCK_STOCK.pe,
+                    pb: fundamentalsRes?.pb ?? MOCK_STOCK.pb,
+                    divYield: fundamentalsRes?.dividendYield ?? MOCK_STOCK.divYield,
+                    eps: fundamentalsRes?.eps ?? 0,
+                    roe: fundamentalsRes?.roe ?? 0,
+                    avgVolume: fundamentalsRes?.avgVolume ?? 0,
+                    high52w: fundamentalsRes?.high52w ?? stockRes.fiftyTwoWeek?.high ?? MOCK_STOCK.high52w,
+                    low52w: fundamentalsRes?.low52w ?? stockRes.fiftyTwoWeek?.low ?? MOCK_STOCK.low52w,
+                    exchange: stockRes.exchange ?? MOCK_STOCK.exchange,
+                    changes: stockRes.changes ?? MOCK_STOCK.changes, // ← use full changes object only
                 });
 
-                setChartData(Array.isArray(stock.chart) ? stock.chart : []);
-
-                // ✅ SET FINANCIALS SEPARATELY
-                setFinancials(financials);
+                setChartData(Array.isArray(stockRes.chart) ? stockRes.chart : []);
+                setfundamentals(fundamentalsRes);
+                setFinancials(financialsRes);
 
             } catch (err) {
                 console.warn("Fallback to mock:", err.message);
-
                 setError("Using demo data — backend not running");
-
-                setStockData({
-                    ...MOCK_STOCK,
-                    symbol: symbol.toUpperCase()
-                });
-
+                setStockData({ ...MOCK_STOCK, symbol: symbol.toUpperCase() });
                 setChartData([]);
-                setFinancials(null); // ✅ reset
-
+                setfundamentals(null);
+                setFinancials(null);
             } finally {
                 setLoading(false);
             }
         };
 
+        loadBaseData();
+    }, [symbol]); // ← only symbol, NOT selectedPeriod
 
-        loadData();
 
-    }, [symbol, selectedPeriod]);
+    // Runs on period change — fetches ONLY chart data, does NOT touch changes
+    useEffect(() => {
+        if (!symbol) return;
+
+        const loadChart = async () => {
+            try {
+                const token = localStorage.getItem("accessToken");
+                const res = await fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                setChartData(Array.isArray(data.chart) ? data.chart : []);
+                // ← do NOT call setStockData here, so changes never get overwritten
+            } catch (err) {
+                console.error("Chart fetch error:", err);
+                setChartData([]);
+            }
+        };
+
+        loadChart();
+    }, [symbol, selectedPeriod]); // ← period changes only update chart
 
     // ── Derived values ────────────────────────────────────────────────────────
     const periodChange = stockData.changes?.[selectedPeriod] || { change: 0, percent: 0 };

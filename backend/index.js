@@ -68,7 +68,7 @@ app.get("/stocks", authMiddleware, async (req, res) => {
       uniqueSymbols.map(symbol => getStockQuote(symbol))
     );
 
-    const holdingsData = stocksData.filter(s => holdingsSymbols.includes(s.symbol));
+    const holdingsData = stocksData.filter(s => holdingSymbols.includes(s.symbol));
     const watchlistData = stocksData.filter(s => watchlistSymbols.includes(s.symbol));
     const ordersData = stocksData.filter(s => orderSymbols.includes(s.symbol));
 
@@ -80,9 +80,11 @@ app.get("/stocks", authMiddleware, async (req, res) => {
   }
 });
 
-app.get("/stock/:symbol", authMiddleware, async (req, res) => {
+app.get("/stock/:symbol", async (req, res) => {
   const { symbol } = req.params;
-  const { period } = req.query; // "1D", "1W", "1M", "1Y"
+  const { period } = req.query;
+
+  console.log("Stock route hit:", symbol, period);
 
 
   console.log("------ STOCK API CALLED ------");
@@ -96,12 +98,12 @@ app.get("/stock/:symbol", authMiddleware, async (req, res) => {
 
     switch (period) {
       case "1D": interval = "1min"; break;
-      case "1W": interval = "5min"; break;      // or "1day" depending on your preference
+      case "1W": interval = "5min"; break;
       case "1M": interval = "1h"; break;
       case "1Y": interval = "1day"; break;
       case "3Y": interval = "1week"; break;
-      case "5Y": interval = "1month"; break;
-      default: interval = "15min";
+      case "5Y": interval = "1week"; break;
+      default: interval = "1min";
     }
 
     const stockInfo = await getStockData(symbol, interval, period);
@@ -112,13 +114,14 @@ app.get("/stock/:symbol", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "Stock not found" });
     }
 
-    res.json(stockInfo); // chart is already included inside stockInfo
     console.log("Stock info sent:", {
       symbol: stockInfo.symbol,
       price: stockInfo.price,
       changes: stockInfo.changes,
       chartLength: stockInfo.chart.length
     });
+
+    res.json(stockInfo);
 
 
   } catch (err) {
