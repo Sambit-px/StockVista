@@ -71,6 +71,7 @@ export function StockPage() {
     const [isInWatchlist, setIsInWatchlist] = useState(false);
     const [orderSide, setOrderSide] = useState("BUY");
     const [news, setNews] = useState([]);
+    const [metrics, setMetrics] = useState([]);
     const [orderType, setOrderType] = useState("MARKET");
     const [qty, setQty] = useState("1");
     const [limitPrice, setLimitPrice] = useState("");
@@ -156,6 +157,26 @@ export function StockPage() {
         }
     };
 
+    const fetchMetrics = async () => {
+        try {
+            const res = await fetch(`${API}/market-metrics/${symbol}`);
+
+            if (res.status === 404) {
+                console.warn(`Financials not found for ${symbol}`);
+                return null;
+            }
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const data = await res.json();
+            return data;
+        } catch (err) {
+            console.error("Financials error:", err);
+            return null;
+        }
+    };
+
+
     // Runs ONCE on symbol load — fetches stock data + changes + fundamentals + financials
     const isFirstLoad = useRef(true);
 
@@ -170,10 +191,11 @@ export function StockPage() {
             try {
                 const token = localStorage.getItem("accessToken");
 
-                const [stockRes, fundamentalsRes, financialsRes] = await Promise.all([
+                const [stockRes, fundamentalsRes, financialsRes, metricRes] = await Promise.all([
                     fetchStock(),
                     fetchFundamentals(),
                     fetchFinancials(),
+                    fetchMetrics(),
                 ]);
 
                 if (stockRes) {
@@ -186,6 +208,7 @@ export function StockPage() {
 
                 setfundamentals(fundamentalsRes);
                 setFinancials(financialsRes);
+                setMetrics(metricRes);
             } catch (err) {
                 console.error(err);
                 setError("Failed to load stock data.");

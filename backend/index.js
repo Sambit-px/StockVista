@@ -170,7 +170,7 @@ app.get("/financials/full/:symbol", async (req, res) => {
   }
 });
 
-app.get("market-metrics/:symbol", async (req, res) => {
+app.get("/market-metrics/:symbol", async (req, res) => {
   try {
     const { symbol } = req.params;
     if (!symbol) return res.status(400).json({ error: "Symbol is required" });
