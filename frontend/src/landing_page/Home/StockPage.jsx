@@ -171,7 +171,12 @@ export function StockPage() {
                 const token = localStorage.getItem("accessToken");
 
                 const [stockRes, fundamentalsRes, financialsRes] = await Promise.all([
-                    fetchStock(),
+                    fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    }).then(r => {
+                        if (!r.ok) return null;
+                        return r.json();
+                    }),
                     fetchFundamentals(),
                     fetchFinancials(),
                 ]);
