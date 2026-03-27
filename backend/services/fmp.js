@@ -57,26 +57,32 @@ async function getMostActive() {
 
 async function getMarketMetrics(symbol) {
     try {
-        // Profile for PE, PB, dividend
-        const profileRes = await axios.get(`https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${FMP_API_KEY}`);
-        const profile = profileRes.data?.[0] ?? {};
-
-        // Key metrics for advanced ratios
-        const metricsRes = await axios.get(`https://financialmodelingprep.com/stable/key-metrics?symbol=${symbol}&apikey=${FMP_API_KEY}`);
+        // 1️⃣ Get key metrics
+        const metricsRes = await axios.get(
+            `https://financialmodelingprep.com/stable/key-metrics?symbol=${symbol}&apikey=${FMP_API_KEY}`
+        );
         const metrics = metricsRes.data?.[0] ?? {};
+
+        // 2️⃣ Get current stock price from profile
+        const profileRes = await axios.get(
+            `https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${FMP_API_KEY}`
+        );
+        const profile = profileRes.data?.[0] ?? {};
+        const price = profile.price ?? null;
 
         return {
             marketCap: profile.marketCap ?? null,
-            peRatio: profile.pe ?? null,
-            pbRatio: profile.price && profile.bookValue ? (profile.price / profile.bookValue) : null,
-            dividendYield: profile.lastDividend && profile.price ? (profile.lastDividend / profile.price) : null,
+            peRatio: price && metrics.netIncomePerShare ? price / metrics.netIncomePerShare : null,
+            pbRatio: price && metrics.bookValuePerShare ? price / metrics.bookValuePerShare : null,
+            eps: metrics.netIncomePerShare ?? null,
+            dividendYield: metrics.dividendYieldPercentage ?? null,
             roe: metrics.returnOnEquity ?? null,
             roa: metrics.returnOnAssets ?? null,
-            freeCashFlowYield: metrics.freeCashFlowYield ?? null
+            freeCashFlowYield: metrics.priceToFreeCashFlowRatio ?? null
         };
 
     } catch (err) {
-        console.error("FMP combined metrics error:", err.message);
+        console.error("FMP metrics error:", err.message);
         return {};
     }
 }

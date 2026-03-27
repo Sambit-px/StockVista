@@ -550,12 +550,12 @@ export function StockPage() {
                                         <h3 className="text-base font-semibold mb-4">Fundamentals</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
                                             {[
-                                                { label: "Market Cap", value: setMetrics.marketCap },
-                                                { label: "P/E Ratio", value: setMetrics.peRatio },
-                                                { label: "P/B Ratio", value: setMetrics.pbRatio },
-                                                { label: "Div Yield", value: `${setMetrics.dividendYield}%` },
+                                                { label: "Market Cap", value: formatNumber(metrics.marketCap) },
+                                                { label: "P/E Ratio", value: formatNumber(metrics.peRatio) },
+                                                { label: "P/B Ratio", value: formatNumber(metrics.pbRatio) },
+                                                { label: "Div Yield", value: `${formatNumber(metrics.dividendYield)}%` },
                                                 { label: "Volume", value: stockData.volume },
-                                                { label: "ROE", value: "18.5%" },
+                                                { label: "ROE", value: `${formatNumber(metrics.roe)}%` },
                                                 { label: "EPS (TTM)", value: "86.32" },
                                                 { label: "Industry P/E", value: "--" },
                                             ].map(({ label, value }) => (
