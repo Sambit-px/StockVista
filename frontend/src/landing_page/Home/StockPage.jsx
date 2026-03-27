@@ -550,10 +550,10 @@ export function StockPage() {
                                         <h3 className="text-base font-semibold mb-4">Fundamentals</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
                                             {[
-                                                { label: "Market Cap", value: stockData.marketCap },
-                                                { label: "P/E Ratio", value: stockData.pe },
-                                                { label: "P/B Ratio", value: stockData.pb },
-                                                { label: "Div Yield", value: `${stockData.divYield}%` },
+                                                { label: "Market Cap", value: setMetrics.marketCap },
+                                                { label: "P/E Ratio", value: setMetrics.peRatio },
+                                                { label: "P/B Ratio", value: setMetrics.pbRatio },
+                                                { label: "Div Yield", value: `${setMetrics.dividendYield}%` },
                                                 { label: "Volume", value: stockData.volume },
                                                 { label: "ROE", value: "18.5%" },
                                                 { label: "EPS (TTM)", value: "86.32" },
