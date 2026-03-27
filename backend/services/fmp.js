@@ -81,8 +81,6 @@ async function getMarketMetrics(symbol) {
             eps: eps ?? null,
             dividendYield: dividendYield,
             roe: metrics.returnOnEquity ?? null,
-            roa: metrics.returnOnAssets ?? null,
-            freeCashFlowYield: metrics.priceToFreeCashFlowRatio ?? null
         };
 
     } catch (err) {
