@@ -107,7 +107,7 @@ async function getCompanyNews(symbol, from, to) {
         });
 
         // Clean the response for frontend
-        const news = response.data.slice(0, 10).map(article => ({
+        const news = response.data.slice(0, 50).map(article => ({
             headline: article.headline,
             source: article.source,
             url: article.url,

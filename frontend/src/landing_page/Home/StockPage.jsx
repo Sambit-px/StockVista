@@ -83,6 +83,7 @@ export function StockPage() {
     const [activeTab, setActiveTab] = useState("overview");
     const [isInWatchlist, setIsInWatchlist] = useState(false);
     const [orderSide, setOrderSide] = useState("BUY");
+    const [news, setNews] = useState([]);
     const [orderType, setOrderType] = useState("MARKET");
     const [qty, setQty] = useState("1");
     const [limitPrice, setLimitPrice] = useState("");
@@ -186,7 +187,7 @@ export function StockPage() {
                     fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`, {
                         headers: { Authorization: `Bearer ${token}` },
                     }).then(r => {
-                        if (!r.ok) return null; // ✅ handles 404
+                        if (!r.ok) return null;
                         return r.json();
                     }),
                     fetchFundamentals(),
@@ -194,9 +195,9 @@ export function StockPage() {
                 ]);
 
                 if (stockRes) {
-                    // ✅ only set data if stock was found
                     setStockData(stockRes);
                     setChartData(stockRes.chart || []);
+                    setNews(stockRes.news || []);
                 } else {
                     setError(`Stock "${symbol}" not found or unavailable.`);
                 }
@@ -592,32 +593,55 @@ export function StockPage() {
                             {/* NEWS */}
                             {activeTab === "news" && (
                                 <div className="space-y-4">
-                                    {NEWS_DATA.map((news) => {
-                                        const cfg = getSentimentConfig(news.sentiment);
-                                        const SentimentIcon = cfg.icon;
-                                        return (
-                                            <div key={news.id} className="group cursor-pointer">
-                                                <div className="flex gap-4 p-4 rounded-xl hover:bg-[#1a2130]/50 transition-colors">
-                                                    <div className={`w-8 h-8 rounded-lg ${cfg.bgClass} ${cfg.colorClass} flex items-center justify-center shrink-0 mt-0.5`}>
-                                                        <SentimentIcon className="w-4 h-4" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <h4 className="font-medium text-sm group-hover:text-emerald-400 transition-colors mb-2 leading-snug">
-                                                            {news.title}
-                                                        </h4>
-                                                        <div className="flex items-center gap-3 text-xs text-gray-500">
-                                                            <span className="text-gray-400">{news.source}</span>
-                                                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {news.time}</span>
-                                                            <span className={`flex items-center gap-1 ${cfg.colorClass} ${cfg.bgClass} px-1.5 py-0.5 rounded`}>
-                                                                <SentimentIcon className="w-3 h-3" /> {cfg.label}
-                                                            </span>
+                                    {news.length === 0 ? (
+                                        <p className="text-gray-400 text-sm px-4">No news available</p>
+                                    ) : (
+                                        news.slice(0, 50).map((article, index) => {
+                                            const sentiment = "neutral"; // Finnhub doesn't give sentiment
+                                            const cfg = getSentimentConfig(sentiment);
+                                            const SentimentIcon = cfg.icon;
+
+                                            const timeAgo = new Date(article.datetime * 1000).toLocaleDateString();
+
+                                            return (
+                                                <a
+                                                    key={index}
+                                                    href={article.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="group cursor-pointer block"
+                                                >
+                                                    <div className="flex gap-4 p-4 rounded-xl hover:bg-[#1a2130]/50 transition-colors">
+                                                        <div className={`w-8 h-8 rounded-lg ${cfg.bgClass} ${cfg.colorClass} flex items-center justify-center shrink-0 mt-0.5`}>
+                                                            <SentimentIcon className="w-4 h-4" />
+                                                        </div>
+
+                                                        <div className="flex-1">
+                                                            <h4 className="font-medium text-sm group-hover:text-emerald-400 transition-colors mb-2 leading-snug">
+                                                                {article.headline}
+                                                            </h4>
+
+                                                            <div className="flex items-center gap-3 text-xs text-gray-500">
+                                                                <span className="text-gray-400">{article.source}</span>
+
+                                                                <span className="flex items-center gap-1">
+                                                                    <Clock className="w-3 h-3" />
+                                                                    {timeAgo}
+                                                                </span>
+
+                                                                <span className={`flex items-center gap-1 ${cfg.colorClass} ${cfg.bgClass} px-1.5 py-0.5 rounded`}>
+                                                                    <SentimentIcon className="w-3 h-3" />
+                                                                    {cfg.label}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                                <div className="h-px bg-white/5 mx-4" />
-                                            </div>
-                                        );
-                                    })}
+
+                                                    <div className="h-px bg-white/5 mx-4" />
+                                                </a>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             )}
 
