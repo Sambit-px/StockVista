@@ -71,7 +71,7 @@ async function getMarketMetrics(symbol) {
         const price = profile.price; // from profile endpoint
         const eps = metrics.netIncomePerShare;
         const pb = metrics.bookValuePerShare && price ? price / metrics.bookValuePerShare : null;
-        const pe = eps && price ? price / eps : null;
+        const pe = (eps && price) ? price / eps : null;
         const dividendYield = metrics.dividendYieldPercentage ?? null;
 
         return {
