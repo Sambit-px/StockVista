@@ -93,12 +93,15 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
         const outputsize = intervalOutputSizeMap[interval] || 1000;
 
         // ONLY 2 API CALLS NOW
-        const [quoteRes, chartRes] = await Promise.all([
+        const [quoteRes, chartRes, longTermRes] = await Promise.all([
             axios.get("https://api.twelvedata.com/quote", {
                 params: { symbol, apikey: API_KEY },
             }),
             axios.get("https://api.twelvedata.com/time_series", {
                 params: { symbol, interval, outputsize, apikey: API_KEY },
+            }),
+            axios.get("https://api.twelvedata.com/time_series", {
+                params: { symbol, interval: "1day", outputsize: 1825, apikey: API_KEY },
             }),
         ]);
 
@@ -146,11 +149,13 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
         const periodReturn = calculateReturnFromChart(chart);
 
         // Use same dataset for change calculations
-        const fullValues = values
+        const longTermValues = (longTermRes.data?.values || [])
             .map(v => ({ time: v.datetime, price: +v.close }))
             .reverse();
 
-        const changes = calculateChanges(fullValues, nowPrice, quote);
+        const changes = calculateChanges(longTermValues, nowPrice, quote);
+
+
 
         const result = {
             symbol: quote.symbol,
