@@ -4,6 +4,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const axios = require("axios");
 
 const UserModel = require("./model/UserModel");
 const authMiddleware = require("./middleware/auth.js");
