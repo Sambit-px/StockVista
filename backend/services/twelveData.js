@@ -104,12 +104,14 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
 
         const quote = quoteRes.data;
 
-        if (!quote || quote.code) {
-            console.error("Quote error:", quote.message);
+        if (!quote || quote.code || quote.status === "error") {
+            console.error("Quote error:", quote);
+            return null;
         }
 
-        if (chartRes.data.code) {
-            console.error("Chart error:", chartRes.data.message);
+        if (!chartRes.data || chartRes.data.status === "error" || chartRes.data.code) {
+            console.error("Chart error:", chartRes.data);
+            return null;
         }
 
         const nowPrice = +quote.close || 0;
@@ -194,6 +196,7 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
 
     } catch (error) {
         console.error("TwelveData error:", error.message);
+        return null;
     }
 }
 
