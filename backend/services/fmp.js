@@ -55,8 +55,28 @@ async function getMostActive() {
     }
 }
 
+async function getMarketMetrics(symbol) {
+    try {
+        const res = await axios.get(`https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${FMP_API_KEY}`);
+        const profile = res.data?.[0];
+
+        if (!profile) return {};
+
+        return {
+            marketCap: profile.marketCap ?? null,
+            peRatio: profile.pe ?? null,
+            pbRatio: profile.price && profile?.bookValue ? (profile.price / profile.bookValue) : null,
+            dividendYield: profile.lastDividend && profile.price ? (profile.lastDividend / profile.price) : null,
+        };
+    } catch (err) {
+        console.error("FMP profile error:", err.message);
+        return {};
+    }
+}
+
 module.exports = {
     getTopGainers,
     getTopLosers,
     getMostActive,
+    getMarketMetrics
 };

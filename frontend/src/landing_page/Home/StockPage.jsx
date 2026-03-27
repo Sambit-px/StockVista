@@ -171,12 +171,7 @@ export function StockPage() {
                 const token = localStorage.getItem("accessToken");
 
                 const [stockRes, fundamentalsRes, financialsRes] = await Promise.all([
-                    fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`, {
-                        headers: { Authorization: `Bearer ${token}` },
-                    }).then(r => {
-                        if (!r.ok) return null;
-                        return r.json();
-                    }),
+                    fetchStock(),
                     fetchFundamentals(),
                     fetchFinancials(),
                 ]);
@@ -368,7 +363,7 @@ export function StockPage() {
                                                 </linearGradient>
                                             </defs>
 
-                                            {/* 🔥 ADD THIS */}
+
                                             <YAxis
                                                 domain={[
                                                     (dataMin) => dataMin * 0.998,
@@ -381,7 +376,7 @@ export function StockPage() {
                                                 type="monotone"
                                                 dataKey="price"
                                                 stroke={themeColor}
-                                                strokeWidth={2.5}   // 🔥 slightly thicker
+                                                strokeWidth={2.5}   //  slightly thicker
                                                 fill="url(#colorPrice)"
                                                 isAnimationActive={true}
                                                 animationDuration={800}
@@ -539,7 +534,7 @@ export function StockPage() {
                                                 { label: "Volume", value: stockData.volume },
                                                 { label: "ROE", value: "18.5%" },
                                                 { label: "EPS (TTM)", value: "86.32" },
-                                                { label: "Industry P/E", value: "24.10" },
+                                                { label: "Industry P/E", value: "--" },
                                             ].map(({ label, value }) => (
                                                 <div key={label} className="flex justify-between border-b border-white/5 pb-2">
                                                     <span className="text-gray-500">{label}</span>

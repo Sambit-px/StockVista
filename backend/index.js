@@ -10,9 +10,9 @@ const authMiddleware = require("./middleware/auth.js");
 const authRoutes = require("./routes/auth");
 
 const { getStockQuote, searchStocks, getStockFundamentals, getStockFinancials, getCompanyNews } = require("./services/finnhub");
-const { getIntradayChart } = require("./services/alphaVantage");
+const { getFinancials } = require("./services/alphaVantage");
 const { getStockData } = require("./services/twelveData");
-const { getTopGainers, getTopLosers, getMostActive } = require("./services/fmp");
+const { getTopGainers, getTopLosers, getMostActive, getMarketMetrics } = require("./services/fmp");
 
 const PORT = process.env.PORT || 3002;
 const uri = process.env.MONGO_URL;
@@ -147,6 +147,45 @@ app.get("/stock/:symbol", async (req, res) => {
   } catch (err) {
     console.error("Stock API error:", err.response?.data || err.message);
     res.status(500).json({ error: "Failed to fetch stock data" });
+  }
+});
+
+// GET /financials/full/:symbol
+app.get("/financials/full/:symbol", async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const upperSymbol = symbol.toUpperCase();
+
+    // Fetch everything in one call
+    const financials = await getFinancials(upperSymbol);
+
+    if (!financials) {
+      return res.status(404).json({ error: "Financials not found" });
+    }
+
+    res.json(financials);
+  } catch (err) {
+    console.error("Full financials error:", err.message);
+    res.status(500).json({ error: "Failed to fetch full financials" });
+  }
+});
+
+app.get("market-metrics/:symbol", async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    if (!symbol) return res.status(400).json({ error: "Symbol is required" });
+
+    const metrics = await getMarketMetrics(symbol.toUpperCase());
+
+    if (!metrics || Object.keys(metrics).length === 0) {
+      return res.status(404).json({ error: "Metrics not found" });
+    }
+
+    res.json(metrics);
+
+  } catch (err) {
+    console.error("Market Metrics error:", err.message);
+    res.status(500).json({ error: "Failed to fetch market metrics" });
   }
 });
 
