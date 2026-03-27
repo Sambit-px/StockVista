@@ -132,11 +132,8 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
         const days = periodDaysMap[period] || 1;
         const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
-
-        const usesCutoff = ["1D", "1W", "1M"].includes(period);
-
         let chart = values
-            .filter(v => usesCutoff ? new Date(v.datetime) >= cutoff : true)
+            .filter(v => new Date(v.datetime) >= cutoff)
             .map(v => ({ time: v.datetime, price: +v.close }))
             .reverse();
 
