@@ -108,8 +108,9 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
             console.error("Quote error:", quote.message);
         }
 
-        if (chartRes.data.code) {
-            console.error("Chart error:", chartRes.data.message);
+        if (!chartRes.data || chartRes.data.status === "error") {
+            console.error("Chart API failed:", chartRes.data);
+            return null;
         }
 
         const nowPrice = +quote.close || 0;
