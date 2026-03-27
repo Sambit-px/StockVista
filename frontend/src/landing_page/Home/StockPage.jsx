@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
     ArrowLeft,
@@ -176,92 +176,62 @@ export function StockPage() {
     };
 
     // Runs ONCE on symbol load — fetches stock data + changes + fundamentals + financials
+    const isFirstLoad = useRef(true);
+
     useEffect(() => {
         if (!symbol) return;
 
+        isFirstLoad.current = true;
+
         const loadBaseData = async () => {
             setLoading(true);
-            setError(null);
             try {
                 const token = localStorage.getItem("accessToken");
 
-                // Fetch stock + fundamentals + financials in parallel
                 const [stockRes, fundamentalsRes, financialsRes] = await Promise.all([
-                    fetch(`${API}/stock/${symbol}?period=1D`, {
-                        headers: { Authorization: `Bearer ${token}` }
+                    fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`, {
+                        headers: { Authorization: `Bearer ${token}` },
                     }).then(r => r.json()),
                     fetchFundamentals(),
-                    fetchFinancials()
+                    fetchFinancials(),
                 ]);
 
-                if (stockRes.error) throw new Error(stockRes.error);
-
-                // Set stock data
-                setStockData({
-                    symbol: stockRes.symbol || symbol.toUpperCase(),
-                    name: stockRes.name || "",
-                    price: stockRes.price ?? MOCK_STOCK.price,
-                    change: stockRes.change ?? MOCK_STOCK.change, // ← keep the overall change
-                    changePercent: stockRes.changePercent ?? MOCK_STOCK.changePercent,
-                    open: stockRes.open ?? MOCK_STOCK.open,
-                    high: stockRes.high ?? MOCK_STOCK.high,
-                    low: stockRes.low ?? MOCK_STOCK.low,
-                    prevClose: stockRes.prevClose ?? MOCK_STOCK.prevClose,
-                    volume: stockRes.volume ?? MOCK_STOCK.volume,
-                    marketCap: fundamentalsRes?.marketCap ?? MOCK_STOCK.marketCap,
-                    pe: fundamentalsRes?.pe ?? MOCK_STOCK.pe,
-                    pb: fundamentalsRes?.pb ?? MOCK_STOCK.pb,
-                    divYield: fundamentalsRes?.dividendYield ?? MOCK_STOCK.divYield,
-                    eps: fundamentalsRes?.eps ?? 0,
-                    roe: fundamentalsRes?.roe ?? 0,
-                    avgVolume: fundamentalsRes?.avgVolume ?? 0,
-                    high52w: fundamentalsRes?.high52w ?? stockRes.fiftyTwoWeek?.high ?? MOCK_STOCK.high52w,
-                    low52w: fundamentalsRes?.low52w ?? stockRes.fiftyTwoWeek?.low ?? MOCK_STOCK.low52w,
-                    exchange: stockRes.exchange ?? MOCK_STOCK.exchange,
-                    changes: stockRes.changes ?? MOCK_STOCK.changes, // ← use full changes object only
-                });
-
-                setChartData(Array.isArray(stockRes.chart) ? stockRes.chart : []);
+                setStockData(stockRes);
+                setChartData(stockRes.chart || []);
                 setfundamentals(fundamentalsRes);
                 setFinancials(financialsRes);
-
             } catch (err) {
-                console.warn("Fallback to mock:", err.message);
-                setError("Using demo data — backend not running");
-                setStockData({ ...MOCK_STOCK, symbol: symbol.toUpperCase() });
-                setChartData([]);
-                setfundamentals(null);
-                setFinancials(null);
+                console.error(err);
             } finally {
                 setLoading(false);
+                isFirstLoad.current = false; // ✅ important
             }
         };
 
         loadBaseData();
-    }, [symbol]); // ← only symbol, NOT selectedPeriod
+    }, [symbol]);
 
-
-    // Runs on period change — fetches ONLY chart data, does NOT touch changes
+    // Only fetch chart after first load
     useEffect(() => {
         if (!symbol) return;
+        if (isFirstLoad.current) return; // 🔒 guard first render
 
         const loadChart = async () => {
+            const token = localStorage.getItem("accessToken");
             try {
-                const token = localStorage.getItem("accessToken");
                 const res = await fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: { Authorization: `Bearer ${token}` },
                 });
+                if (!res.ok) return; // handle 404 or error
                 const data = await res.json();
-                setChartData(Array.isArray(data.chart) ? data.chart : []);
-                // ← do NOT call setStockData here, so changes never get overwritten
+                setChartData(data.chart || []);
             } catch (err) {
-                console.error("Chart fetch error:", err);
-                setChartData([]);
+                console.error(err);
             }
         };
 
         loadChart();
-    }, [symbol, selectedPeriod]); // ← period changes only update chart
+    }, [symbol, selectedPeriod]);
 
     // ── Derived values ────────────────────────────────────────────────────────
     const periodChange = stockData.changes?.[selectedPeriod] || { change: 0, percent: 0 };
