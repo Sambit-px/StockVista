@@ -68,14 +68,18 @@ async function getMarketMetrics(symbol) {
             `https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${FMP_API_KEY}`
         );
         const profile = profileRes.data?.[0] ?? {};
-        const price = profile.price ?? null;
+        const price = profile.price; // from profile endpoint
+        const eps = metrics.netIncomePerShare;
+        const pb = metrics.bookValuePerShare && price ? price / metrics.bookValuePerShare : null;
+        const pe = eps && price ? price / eps : null;
+        const dividendYield = metrics.dividendYieldPercentage ?? null;
 
         return {
             marketCap: profile.marketCap ?? null,
-            peRatio: price && metrics.netIncomePerShare ? price / metrics.netIncomePerShare : null,
-            pbRatio: price && metrics.bookValuePerShare ? price / metrics.bookValuePerShare : null,
-            eps: metrics.netIncomePerShare ?? null,
-            dividendYield: metrics.dividendYieldPercentage ?? null,
+            peRatio: pe,
+            pbRatio: pb,
+            eps: eps ?? null,
+            dividendYield: dividendYield,
             roe: metrics.returnOnEquity ?? null,
             roa: metrics.returnOnAssets ?? null,
             freeCashFlowYield: metrics.priceToFreeCashFlowRatio ?? null
