@@ -98,19 +98,12 @@ export function StockPage() {
     const key = financials?.keyFinancials;
     const income = financials?.incomeStatement;
 
+    // ✅ AFTER — just an empty formatNumber for now
     function formatNumber(num) {
-        const fetchFinancials = async () => {
-            try {
-                const res = await fetch(`${API}/stock-financials/${symbol}`);
-
-
-                const data = await res.json();
-                return data;
-            } catch (err) {
-                console.error("Financials error:", err);
-                return null;
-            }
-        };
+        if (num === null || num === undefined) return "N/A";
+        if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + "B";
+        if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + "M";
+        return num.toLocaleString();
     }
 
     const fetchStock = async () => {
@@ -183,6 +176,7 @@ export function StockPage() {
 
         isFirstLoad.current = true;
 
+        // ✅ AFTER
         const loadBaseData = async () => {
             setLoading(true);
             try {
@@ -191,20 +185,30 @@ export function StockPage() {
                 const [stockRes, fundamentalsRes, financialsRes] = await Promise.all([
                     fetch(`${API}/stock/${symbol}?period=${selectedPeriod}`, {
                         headers: { Authorization: `Bearer ${token}` },
-                    }).then(r => r.json()),
+                    }).then(r => {
+                        if (!r.ok) return null; // ✅ handles 404
+                        return r.json();
+                    }),
                     fetchFundamentals(),
                     fetchFinancials(),
                 ]);
 
-                setStockData(stockRes);
-                setChartData(stockRes.chart || []);
+                if (stockRes) {
+                    // ✅ only set data if stock was found
+                    setStockData(stockRes);
+                    setChartData(stockRes.chart || []);
+                } else {
+                    setError(`Stock "${symbol}" not found or unavailable.`);
+                }
+
                 setfundamentals(fundamentalsRes);
                 setFinancials(financialsRes);
             } catch (err) {
                 console.error(err);
+                setError("Failed to load stock data.");
             } finally {
                 setLoading(false);
-                isFirstLoad.current = false; // ✅ important
+                isFirstLoad.current = false;
             }
         };
 
