@@ -82,12 +82,13 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
             }
         }
 
+        // ✅ FIX
         const intervalOutputSizeMap = {
-            "1min": 1000,
-            "5min": 600,
-            "1h": 800,
-            "1day": 1000,
-            "1week": 2000,
+            "1min": 390,   // 1 trading day
+            "5min": 500,   // 1 week
+            "1h": 720,     // 1 month
+            "1day": 365,   // 1 year
+            "1week": 5000, // max weekly points
         };
 
         const outputsize = intervalOutputSizeMap[interval] || 1000;
@@ -131,12 +132,12 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
         const days = periodDaysMap[period] || 1;
         const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
+
+        const usesCutoff = ["1D", "1W", "1M"].includes(period);
+
         let chart = values
-            .filter(v => new Date(v.datetime) >= cutoff)
-            .map(v => ({
-                time: v.datetime,
-                price: +v.close
-            }))
+            .filter(v => usesCutoff ? new Date(v.datetime) >= cutoff : true)
+            .map(v => ({ time: v.datetime, price: +v.close }))
             .reverse();
 
         const MAX_POINTS = 200;
