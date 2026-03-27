@@ -9,7 +9,7 @@ const UserModel = require("./model/UserModel");
 const authMiddleware = require("./middleware/auth.js");
 const authRoutes = require("./routes/auth");
 
-const { getStockQuote, searchStocks, getStockFundamentals, getStockFinancials } = require("./services/finnhub");
+const { getStockQuote, searchStocks, getStockFundamentals, getStockFinancials, getCompanyNews } = require("./services/finnhub");
 const { getIntradayChart } = require("./services/alphaVantage");
 const { getStockData } = require("./services/twelveData");
 const { getTopGainers, getTopLosers, getMostActive } = require("./services/fmp");
@@ -106,13 +106,6 @@ app.get("/stock/:symbol", async (req, res) => {
 
   console.log("Stock route hit:", symbol, period);
 
-
-  console.log("------ STOCK API CALLED ------");
-  console.log("Symbol:", symbol);
-  console.log("Period:", period);
-  console.log("Time:", new Date().toLocaleTimeString());
-  console.log("------------------------------");
-
   try {
     let interval;
 
@@ -126,44 +119,34 @@ app.get("/stock/:symbol", async (req, res) => {
       default: interval = "1min";
     }
 
-    const stockInfo = await getStockData(symbol, interval, period);
-    console.log("StockInfo received from service:", stockInfo);
+    // -------- ALWAYS FETCH 5 YEARS NEWS --------
+    const today = new Date();
+    const past = new Date();
+    past.setFullYear(today.getFullYear() - 5);
 
+    const from = past.toISOString().split("T")[0];
+    const to = today.toISOString().split("T")[0];
+    // ------------------------------------------
+
+    console.log("News range:", from, "to", to);
+
+    const [stockInfo, news] = await Promise.all([
+      getStockData(symbol, interval, period),
+      getCompanyNews(symbol, from, to)
+    ]);
 
     if (!stockInfo) {
       return res.status(404).json({ error: "Stock not found" });
     }
 
-    console.log("Stock info sent:", {
-      symbol: stockInfo.symbol,
-      price: stockInfo.price,
-      changes: stockInfo.changes,
-      chartLength: stockInfo.chart.length
+    res.json({
+      ...stockInfo,
+      news
     });
-
-    res.json(stockInfo);
-
 
   } catch (err) {
     console.error("Stock API error:", err.response?.data || err.message);
     res.status(500).json({ error: "Failed to fetch stock data" });
-
-  }
-});
-
-
-app.get("/stock-chart/:symbol", authMiddleware, async (req, res) => {
-  try {
-
-    const { symbol } = req.params;
-    const { interval } = req.query;
-
-    const chart = await getIntradayChart(symbol, interval || "1h");
-
-    res.json(chart);
-
-  } catch (error) {
-    res.status(500).json({ error: "Chart fetch failed" });
   }
 });
 

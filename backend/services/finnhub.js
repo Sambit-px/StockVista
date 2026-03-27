@@ -87,6 +87,43 @@ async function getStockFundamentals(symbol) {
     }
 }
 
+async function getCompanyNews(symbol, from, to) {
+    try {
+        // Default: last 7 days if not provided
+        const today = new Date();
+        const past = new Date();
+        past.setDate(today.getDate() - 7);
+
+        const fromDate = from || past.toISOString().split("T")[0];
+        const toDate = to || today.toISOString().split("T")[0];
+
+        const response = await axios.get("https://finnhub.io/api/v1/company-news", {
+            params: {
+                symbol,
+                from: fromDate,
+                to: toDate,
+                token: FINNHUB_API_KEY
+            }
+        });
+
+        // Clean the response for frontend
+        const news = response.data.slice(0, 10).map(article => ({
+            headline: article.headline,
+            source: article.source,
+            url: article.url,
+            image: article.image,
+            summary: article.summary,
+            datetime: article.datetime
+        }));
+
+        return news;
+
+    } catch (error) {
+        console.error("Finnhub news error:", error.message);
+        return [];
+    }
+}
+
 async function getStockFinancials(symbol) {
     try {
         const res = await axios.get("https://finnhub.io/api/v1/stock/financials-reported", {
@@ -155,4 +192,4 @@ async function getStockFinancials(symbol) {
     }
 }
 
-module.exports = { searchStocks, getStockQuote, getStockFundamentals, getStockFinancials };
+module.exports = { searchStocks, getStockQuote, getStockFundamentals, getStockFinancials, getCompanyNews };
