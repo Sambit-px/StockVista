@@ -40,12 +40,7 @@ const PEER_STOCKS = [
     { symbol: "ADANIGREEN", name: "Adani Green Energy", price: 1234.80, change: 23.50, changePercent: 1.94, marketCap: "2.0L Cr" },
 ];
 
-const NEWS_DATA = [
-    { id: "1", title: "Reliance Industries announces Q4 results, beats market expectations", source: "Economic Times", time: "2h ago", sentiment: "positive" },
-    { id: "2", title: "RIL expands retail footprint with 200+ new stores across India", source: "Business Standard", time: "5h ago", sentiment: "positive" },
-    { id: "3", title: "Crude oil prices impact could affect Reliance's refining margins", source: "Moneycontrol", time: "1d ago", sentiment: "neutral" },
-    { id: "4", title: "Analysts maintain 'Buy' rating on Reliance with revised target price", source: "CNBC TV18", time: "2d ago", sentiment: "positive" },
-];
+
 
 const MOCK_STOCK = {
     symbol: "RELIANCE",
@@ -66,14 +61,6 @@ const MOCK_STOCK = {
     low52w: 2145.30,
     exchange: "NSE",
 };
-
-function getSentimentConfig(sentiment) {
-    switch (sentiment) {
-        case "positive": return { icon: ThumbsUp, colorClass: "text-emerald-500", bgClass: "bg-emerald-500/10", label: "Positive" };
-        case "negative": return { icon: ThumbsDown, colorClass: "text-red-500", bgClass: "bg-red-500/10", label: "Negative" };
-        default: return { icon: MinusCircle, colorClass: "text-gray-400", bgClass: "bg-white/5", label: "Neutral" };
-    }
-}
 
 export function StockPage() {
     const navigate = useNavigate();
@@ -596,10 +583,8 @@ export function StockPage() {
                                     {news.length === 0 ? (
                                         <p className="text-gray-400 text-sm px-4">No news available</p>
                                     ) : (
-                                        news.slice(0, 20).map((article, index) => {
-                                            const sentiment = "neutral";
-                                            const cfg = getSentimentConfig(sentiment);
-                                            const SentimentIcon = cfg.icon;
+                                        news.slice(0, 50).map((article, index) => {
+
 
                                             const timeAgo = new Date(article.datetime * 1000).toLocaleDateString();
 
@@ -613,21 +598,7 @@ export function StockPage() {
                                                 >
                                                     <div className="flex gap-4 p-4 rounded-xl hover:bg-[#1a2130]/50 transition-colors">
 
-                                                        {/* NEWS IMAGE */}
-                                                        {article.image && (
-                                                            <img
-                                                                src={article.image}
-                                                                alt="news"
-                                                                className="w-20 h-20 object-cover rounded-lg shrink-0"
-                                                            />
-                                                        )}
 
-                                                        {/* ICON */}
-                                                        <div className={`w-8 h-8 rounded-lg ${cfg.bgClass} ${cfg.colorClass} flex items-center justify-center shrink-0 mt-0.5`}>
-                                                            <SentimentIcon className="w-4 h-4" />
-                                                        </div>
-
-                                                        {/* TEXT */}
                                                         <div className="flex-1">
                                                             <h4 className="font-medium text-sm group-hover:text-emerald-400 transition-colors mb-2 leading-snug">
                                                                 {article.headline}
@@ -639,11 +610,6 @@ export function StockPage() {
                                                                 <span className="flex items-center gap-1">
                                                                     <Clock className="w-3 h-3" />
                                                                     {timeAgo}
-                                                                </span>
-
-                                                                <span className={`flex items-center gap-1 ${cfg.colorClass} ${cfg.bgClass} px-1.5 py-0.5 rounded`}>
-                                                                    <SentimentIcon className="w-3 h-3" />
-                                                                    {cfg.label}
                                                                 </span>
                                                             </div>
                                                         </div>
