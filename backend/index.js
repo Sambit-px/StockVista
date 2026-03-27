@@ -16,6 +16,7 @@ const { getTopGainers, getTopLosers, getMostActive } = require("./services/fmp")
 
 const PORT = process.env.PORT || 3002;
 const uri = process.env.MONGO_URL;
+const axios = require("axios");
 
 const app = express();
 
@@ -28,6 +29,22 @@ app.use("/auth", authRoutes);
 app.get("/test", (req, res) => {
   console.log("TEST ROUTE WORKING");
   res.send("server updated");
+});
+
+app.get("/debug-twelve/:symbol", async (req, res) => {
+  const key = process.env.TWELVE_API_KEY;
+  const { symbol } = req.params;
+  try {
+    const r = await axios.get("https://api.twelvedata.com/quote", {
+      params: { symbol, apikey: key }
+    });
+    res.json({
+      keyExists: !!key,
+      twelveDataResponse: r.data  // ✅ shows exact error from TwelveData
+    });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
 });
 
 app.get("/stocks", authMiddleware, async (req, res) => {
