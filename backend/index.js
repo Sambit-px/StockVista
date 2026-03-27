@@ -45,11 +45,7 @@ app.get("/debug-twelve/:symbol", async (req, res) => {
     res.json({ error: err.message });
   }
 });
-```
 
-Then visit:
-```
-https://stockvista-20p2.onrender.com/debug-twelve/AAPL
 
 app.get("/stocks", authMiddleware, async (req, res) => {
   try {
