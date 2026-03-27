@@ -479,8 +479,8 @@ export function StockPage() {
                                             {[
                                                 { label: "Today's Low", value: `$${Number(stockData.low).toFixed(2)}` },
                                                 { label: "Today's High", value: `$${Number(stockData.high).toFixed(2)}` },
-                                                { label: "52W Low", value: `$${Number(stockData.low52w).toFixed(2)}` },
-                                                { label: "52W High", value: `$${Number(stockData.high52w).toFixed(2)}` },
+                                                { label: "52W Low", value: `$${Number(stockData.fiftyTwoWeek.low).toFixed(2)}` },
+                                                { label: "52W High", value: `$${Number(stockData.fiftyTwoWeek.high).toFixed(2)}` },
                                             ].map(({ label, value }) => (
                                                 <div key={label} className="bg-[#1a2130]/50 p-4 rounded-lg">
                                                     <div className="text-gray-500 mb-1 text-xs">{label}</div>
