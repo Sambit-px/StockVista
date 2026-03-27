@@ -596,8 +596,8 @@ export function StockPage() {
                                     {news.length === 0 ? (
                                         <p className="text-gray-400 text-sm px-4">No news available</p>
                                     ) : (
-                                        news.slice(0, 50).map((article, index) => {
-                                            const sentiment = "neutral"; // Finnhub doesn't give sentiment
+                                        news.slice(0, 20).map((article, index) => {
+                                            const sentiment = "neutral";
                                             const cfg = getSentimentConfig(sentiment);
                                             const SentimentIcon = cfg.icon;
 
@@ -612,10 +612,22 @@ export function StockPage() {
                                                     className="group cursor-pointer block"
                                                 >
                                                     <div className="flex gap-4 p-4 rounded-xl hover:bg-[#1a2130]/50 transition-colors">
+
+                                                        {/* NEWS IMAGE */}
+                                                        {article.image && (
+                                                            <img
+                                                                src={article.image}
+                                                                alt="news"
+                                                                className="w-20 h-20 object-cover rounded-lg shrink-0"
+                                                            />
+                                                        )}
+
+                                                        {/* ICON */}
                                                         <div className={`w-8 h-8 rounded-lg ${cfg.bgClass} ${cfg.colorClass} flex items-center justify-center shrink-0 mt-0.5`}>
                                                             <SentimentIcon className="w-4 h-4" />
                                                         </div>
 
+                                                        {/* TEXT */}
                                                         <div className="flex-1">
                                                             <h4 className="font-medium text-sm group-hover:text-emerald-400 transition-colors mb-2 leading-snug">
                                                                 {article.headline}
