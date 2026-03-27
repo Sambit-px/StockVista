@@ -30,6 +30,27 @@ app.get("/test", (req, res) => {
   res.send("server updated");
 });
 
+app.get("/debug-twelve/:symbol", async (req, res) => {
+  const { symbol } = req.params;
+  try {
+    const result = await axios.get("https://api.twelvedata.com/quote", {
+      params: { symbol, apikey: process.env.TWELVE_API_KEY }
+    });
+    res.json({
+      keyExists: !!process.env.TWELVE_API_KEY,
+      keyPreview: process.env.TWELVE_API_KEY?.slice(0, 6) + "...",
+      data: result.data
+    });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+```
+
+Then visit:
+```
+https://stockvista-20p2.onrender.com/debug-twelve/AAPL
+
 app.get("/stocks", authMiddleware, async (req, res) => {
   try {
     const { symbols } = req.query;
