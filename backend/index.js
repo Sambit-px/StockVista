@@ -25,7 +25,10 @@ app.use(bodyParser.json());
 
 app.use("/auth", authRoutes);
 
-
+app.get("/test", (req, res) => {
+  console.log("TEST ROUTE WORKING");
+  res.send("server updated");
+});
 
 app.get("/stocks", authMiddleware, async (req, res) => {
   try {
