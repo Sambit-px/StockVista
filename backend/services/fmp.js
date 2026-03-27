@@ -57,30 +57,28 @@ async function getMostActive() {
 
 async function getMarketMetrics(symbol) {
     try {
-        // 1️⃣ Get key metrics
-        const metricsRes = await axios.get(
-            `https://financialmodelingprep.com/stable/key-metrics?symbol=${symbol}&apikey=${FMP_API_KEY}`
-        );
-        const metrics = metricsRes.data?.[0] ?? {};
-
-        // 2️⃣ Get current stock price from profile
+        // 1️⃣ Get current stock profile for marketCap and price
         const profileRes = await axios.get(
             `https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${FMP_API_KEY}`
         );
         const profile = profileRes.data?.[0] ?? {};
-        const price = profile.price; // from profile endpoint
-        const eps = metrics.netIncomePerShare;
-        const pb = metrics.bookValuePerShare && price ? price / metrics.bookValuePerShare : null;
-        const pe = (eps && price) ? price / eps : null;
-        const dividendYield = metrics.dividendYieldPercentage ?? null;
+
+        // 2️⃣ Get financial ratios for PE, PB, EPS, Dividend Yield
+        const ratiosRes = await axios.get(
+            `https://financialmodelingprep.com/stable/ratios?symbol=${symbol}&limit=1&period=FY&apikey=${FMP_API_KEY}`
+        );
+        const ratios = ratiosRes.data ?? [];
+        const data = ratios[0] ?? {};
 
         return {
             marketCap: profile.marketCap ?? null,
-            peRatio: pe,
-            pbRatio: pb,
-            eps: eps ?? null,
-            dividendYield: dividendYield,
-            roe: metrics.returnOnEquity ?? null,
+            peRatio: data.priceToEarningsRatio ?? null,
+            pbRatio: data.priceToBookRatio ?? null,
+            eps: data.netIncomePerShare ?? null,
+            dividendYield: data.dividendYieldPercentage ?? null,
+            roe: data.returnOnEquity ?? null,
+            roa: data.returnOnAssets ?? null,
+            freeCashFlowYield: data.priceToFreeCashFlowRatio ?? null,
         };
 
     } catch (err) {
