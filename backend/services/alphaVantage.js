@@ -40,9 +40,6 @@ async function getFinancials(symbol) {
             balanceSheet: balance,
             cashFlow,
             ratios,
-            marketMetrics: {
-                note: "Price, marketCap, P/E, P/B, dividendYield not available via Alpha Vantage"
-            }
         };
 
     } catch (err) {

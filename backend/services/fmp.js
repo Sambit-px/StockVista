@@ -57,19 +57,26 @@ async function getMostActive() {
 
 async function getMarketMetrics(symbol) {
     try {
-        const res = await axios.get(`https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${FMP_API_KEY}`);
-        const profile = res.data?.[0];
+        // Profile for PE, PB, dividend
+        const profileRes = await axios.get(`https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${FMP_API_KEY}`);
+        const profile = profileRes.data?.[0] ?? {};
 
-        if (!profile) return {};
+        // Key metrics for advanced ratios
+        const metricsRes = await axios.get(`https://financialmodelingprep.com/stable/key-metrics?symbol=${symbol}&apikey=${FMP_API_KEY}`);
+        const metrics = metricsRes.data?.[0] ?? {};
 
         return {
             marketCap: profile.marketCap ?? null,
             peRatio: profile.pe ?? null,
-            pbRatio: profile.price && profile?.bookValue ? (profile.price / profile.bookValue) : null,
+            pbRatio: profile.price && profile.bookValue ? (profile.price / profile.bookValue) : null,
             dividendYield: profile.lastDividend && profile.price ? (profile.lastDividend / profile.price) : null,
+            roe: metrics.returnOnEquity ?? null,
+            roa: metrics.returnOnAssets ?? null,
+            freeCashFlowYield: metrics.freeCashFlowYield ?? null
         };
+
     } catch (err) {
-        console.error("FMP profile error:", err.message);
+        console.error("FMP combined metrics error:", err.message);
         return {};
     }
 }
