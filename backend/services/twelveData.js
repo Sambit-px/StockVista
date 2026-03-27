@@ -129,10 +129,18 @@ async function getStockData(symbol, interval = "1min", period = "1D") {
             "5Y": 365 * 5,
         };
 
+        // ✅ FIX — use longTermRes for 1Y, 3Y, 5Y since it has 5 years of daily data
+        const longPeriods = ["1Y", "3Y", "5Y"];
+
         const days = periodDaysMap[period] || 1;
         const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
-        let chart = values
+        // pick the right dataset based on period
+        const sourceValues = longPeriods.includes(period)
+            ? (longTermRes.data?.values || [])   // ✅ 5 years of daily data
+            : (chartRes.data?.values || []);     // short term intraday data
+
+        let chart = sourceValues
             .filter(v => new Date(v.datetime) >= cutoff)
             .map(v => ({ time: v.datetime, price: +v.close }))
             .reverse();
