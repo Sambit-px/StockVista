@@ -4,7 +4,6 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const axios = require("axios");
 
 const UserModel = require("./model/UserModel");
 const authMiddleware = require("./middleware/auth.js");
@@ -30,39 +29,6 @@ app.get("/test", (req, res) => {
   console.log("TEST ROUTE WORKING");
   res.send("server updated");
 });
-
-app.get("/debug-twelve/:symbol", async (req, res) => {
-  const { symbol } = req.params;
-  try {
-    const key = process.env.TWELVE_API_KEY;
-    const url = `https://api.twelvedata.com/quote?symbol=${symbol}&apikey=${key}`;
-
-    console.log("Key exists:", !!key);
-    console.log("Key value:", key); // ✅ print full key in terminal
-    console.log("URL:", url);
-
-    const result = await fetch(url);
-    const data = await result.json();
-
-    console.log("TwelveData response:", data); // ✅ print response in terminal
-
-    res.json({
-      keyExists: !!key,
-      keyValue: key, // ✅ see full key in browser too
-      status: result.status,
-      data
-    });
-  } catch (err) {
-    console.error("Debug error:", err); // ✅ full error in terminal
-    res.json({
-      error: err.message,
-      stack: err.stack
-    });
-  }
-});
-
-
-
 
 app.get("/stocks", authMiddleware, async (req, res) => {
   try {
