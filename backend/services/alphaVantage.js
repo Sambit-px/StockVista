@@ -47,7 +47,7 @@ async function getFinancials(symbol) {
         return {
             incomeStatement: { annualReports: [], quarterlyReports: [] },
             balanceSheet: { annualReports: [], quarterlyReports: [] },
-            cashFlow: { annualReports: [], quarterlyReports: [] },
+            cashFlowStatement: { annualReports: [], quarterlyReports: [] },
             ratios: {},
             marketMetrics: { note: "No data available" },
         };
