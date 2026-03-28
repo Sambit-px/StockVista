@@ -83,9 +83,45 @@ export function StockPage() {
     const [chartData, setChartData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
+    const [fullFinancials, setFullFinancials] = useState(null);
+    const [finSubTab, setFinSubTab] = useState("income");
+    const [period, setPeriod] = useState("annual");
+    const [finReports, setFinReports] = useState([]);
+    const [finRows, setFinRows] = useState([]);
     const key = financials?.keyFinancials;
     const income = financials?.incomeStatement;
+    const INCOME_ROWS = [
+        { label: "Total Revenue", field: "totalRevenue" },
+        { label: "Cost of Revenue", field: "costOfRevenue" },
+        { label: "Gross Profit", field: "grossProfit", bold: true },
+        { label: "Operating Expenses", field: "operatingExpenses" },
+        { label: "Operating Income", field: "operatingIncome", bold: true },
+        { label: "EBITDA", field: "ebitda" },
+        { label: "Interest Expense", field: "interestExpense" },
+        { label: "Net Income", field: "netIncome", bold: true },
+        { label: "EPS (Diluted)", field: "dilutedEPS", money: false },
+    ];
+
+    const BALANCE_ROWS = [
+        { label: "Total Assets", field: "totalAssets", bold: true },
+        { label: "Current Assets", field: "totalCurrentAssets" },
+        { label: "Cash & Equivalents", field: "cashAndCashEquivalentsAtCarryingValue" },
+        { label: "Total Liabilities", field: "totalLiabilities", bold: true },
+        { label: "Current Liabilities", field: "totalCurrentLiabilities" },
+        { label: "Long-term Debt", field: "longTermDebt" },
+        { label: "Shareholder Equity", field: "totalShareholderEquity", bold: true },
+        { label: "Shares Outstanding", field: "commonStockSharesOutstanding", money: false },
+    ];
+
+    const CASH_ROWS = [
+        { label: "Operating Cash Flow", field: "operatingCashflow", bold: true },
+        { label: "Capital Expenditures", field: "capitalExpenditures" },
+        { label: "Investing Cash Flow", field: "cashflowFromInvestment" },
+        { label: "Financing Cash Flow", field: "cashflowFromFinancing" },
+        { label: "Net Change in Cash", field: "changeInCash" },
+        { label: "Free Cash Flow", field: "freeCashFlow" },
+        { label: "Dividend Payout", field: "dividendPayout" },
+    ];
 
     // ✅ AFTER — just an empty formatNumber for now
     function formatNumber(num) {
@@ -176,6 +212,34 @@ export function StockPage() {
         }
     };
 
+    const fetchFullFinancials = async () => {
+        try {
+            const token = localStorage.getItem("accessToken");
+            const res = await fetch(`${API}/financials/full/${symbol}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+            if (res.status === 404) {
+                console.warn(`Full financials not found for ${symbol}`);
+                return null;
+            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch (err) {
+            console.error("Full financials error:", err);
+            return null;
+        }
+    };
+
+    function colLabel(report) {
+        const d = report.fiscalDateEnding || "";
+        if (!d) return "—";
+        if (period === "quarterly") {
+            const date = new Date(d);
+            const q = Math.ceil((date.getMonth() + 1) / 3);
+            return `Q${q} '${String(date.getFullYear()).slice(2)}`;
+        }
+        return d.slice(0, 4);
+    }
 
     // Runs ONCE on symbol load — fetches stock data + changes + fundamentals + financials
     const isFirstLoad = useRef(true);
@@ -191,11 +255,12 @@ export function StockPage() {
             try {
                 const token = localStorage.getItem("accessToken");
 
-                const [stockRes, fundamentalsRes, financialsRes, metricRes] = await Promise.all([
+                const [stockRes, fundamentalsRes, financialsRes, metricRes, fullFinancialsRes] = await Promise.all([
                     fetchStock(),
                     fetchFundamentals(),
                     fetchFinancials(),
                     fetchMetrics(),
+                    fetchFullFinancials(),
                 ]);
 
                 if (stockRes) {
@@ -209,6 +274,7 @@ export function StockPage() {
                 setfundamentals(fundamentalsRes);
                 setFinancials(financialsRes);
                 setMetrics(metricRes);
+                setFullFinancials(fullFinancialsRes);
             } catch (err) {
                 console.error(err);
                 setError("Failed to load stock data.");
@@ -242,6 +308,20 @@ export function StockPage() {
 
         loadChart();
     }, [symbol, selectedPeriod]);
+
+    useEffect(() => {
+        if (!fullFinancials) return;
+
+        const sourceMap = {
+            income: period === "annual" ? fullFinancials.incomeStatement?.annualReports : fullFinancials.incomeStatement?.quarterlyReports,
+            balance: period === "annual" ? fullFinancials.balanceSheet?.annualReports : fullFinancials.balanceSheet?.quarterlyReports,
+            cash: period === "annual" ? fullFinancials.cashFlow?.annualReports : fullFinancials.cashFlow?.quarterlyReports,
+        };
+
+        setFinReports((sourceMap[finSubTab] || []).slice(0, 5));
+        setFinRows({ income: INCOME_ROWS, balance: BALANCE_ROWS, cash: CASH_ROWS }[finSubTab]);
+
+    }, [fullFinancials, finSubTab, period]);
 
     // ── Derived values ────────────────────────────────────────────────────────
     const periodChange = stockData.changes?.[selectedPeriod] || { change: 0, percent: 0 };
@@ -753,135 +833,161 @@ export function StockPage() {
                             {/* FINANCIALS */}
                             {activeTab === "financials" && (
                                 <div className="text-sm space-y-8">
-                                    {/* Key metrics */}
+
+                                    {/* ── Key Metrics ───────────────────────────────────────────────── */}
                                     <div>
                                         <h3 className="text-base font-semibold mb-4">Key Financials (TTM)</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                             {[
-                                                {
-                                                    label: "Revenue",
-                                                    value: key?.revenue ? formatNumber(key.revenue) : "--",
-                                                    yoy: key?.revenueGrowth ? `${key.revenueGrowth}%` : "--"
-                                                },
-                                                {
-                                                    label: "Net Profit",
-                                                    value: key?.netProfit ? formatNumber(key.netProfit) : "--",
-                                                    yoy: key?.profitGrowth ? `${key.profitGrowth}%` : "--"
-                                                },
-                                                {
-                                                    label: "EPS",
-                                                    value: stockData.eps || "--",
-                                                    yoy: "--"
-                                                },
-                                                {
-                                                    label: "ROE",
-                                                    value: stockData.roe ? `${stockData.roe}%` : "--",
-                                                    yoy: "--"
-                                                }
+                                                { label: "Revenue", value: fullFinancials?.keyFinancials?.revenue ? formatNumber(fullFinancials.keyFinancials.revenue) : "--", yoy: fullFinancials?.keyFinancials?.revenueGrowth ?? null },
+                                                { label: "Net Profit", value: fullFinancials?.keyFinancials?.netProfit ? formatNumber(fullFinancials.keyFinancials.netProfit) : "--", yoy: fullFinancials?.keyFinancials?.profitGrowth ?? null },
+                                                { label: "EPS (TTM)", value: fullFinancials?.keyFinancials?.eps != null ? `$${fullFinancials.keyFinancials.eps}` : "--", yoy: null },
+                                                { label: "ROE", value: fullFinancials?.keyFinancials?.roe != null ? `${fullFinancials.keyFinancials.roe}%` : "--", yoy: null },
                                             ].map(({ label, value, yoy }) => (
                                                 <div key={label} className="bg-[#1a2130]/50 p-4 rounded-lg">
                                                     <div className="text-gray-500 mb-1 text-xs">{label}</div>
                                                     <div className="font-semibold text-base">{value}</div>
-                                                    <div className="text-emerald-400 text-xs mt-1">{yoy} YoY</div>
+                                                    {yoy != null && (
+                                                        <div className={`text-xs mt-1 ${yoy >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                            {yoy > 0 ? "+" : ""}{yoy}% YoY
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
 
-                                    {/* Income Statement */}
-                                    <div>
-                                        <div className="flex gap-3 mb-4">
-                                            <button className="px-3 py-1.5 bg-white/10 text-white rounded-md text-xs font-medium">Income Statement</button>
-                                            <button className="px-3 py-1.5 text-gray-400 hover:text-white rounded-md text-xs font-medium transition-colors">Balance Sheet</button>
-                                            <button className="px-3 py-1.5 text-gray-400 hover:text-white rounded-md text-xs font-medium transition-colors">Cash Flow</button>
+                                    {/* ── Sub-tabs + Period toggle ──────────────────────────────────── */}
+                                    <div className="flex items-center justify-between flex-wrap gap-3">
+                                        <div className="flex gap-2">
+                                            {[
+                                                { id: "income", label: "Income Statement" },
+                                                { id: "balance", label: "Balance Sheet" },
+                                                { id: "cash", label: "Cash Flow" },
+                                            ].map(({ id, label }) => (
+                                                <button
+                                                    key={id}
+                                                    onClick={() => setFinSubTab(id)}
+                                                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${finSubTab === id ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
+                                                        }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            ))}
                                         </div>
-                                        <div className="border border-white/10 rounded-xl overflow-hidden">
-                                            <table className="w-full text-left">
-                                                <thead className="bg-[#1a2130]/80 border-b border-white/10">
-                                                    <tr>
-                                                        <th className="py-3 px-4 font-medium text-gray-400">Consolidated ($ Cr)</th>
-                                                        <th className="py-3 px-4 font-medium text-gray-400 text-right">Mar 2024</th>
-                                                        <th className="py-3 px-4 font-medium text-gray-400 text-right">Mar 2023</th>
-                                                        <th className="py-3 px-4 font-medium text-gray-400 text-right">Mar 2022</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-white/5">
-                                                    <tr className="hover:bg-white/5 transition-colors">
-                                                        <td className="py-3 px-4 text-gray-300">Sales</td>
-                                                        <td className="py-3 px-4 text-right font-medium">982,440</td>
-                                                        <td className="py-3 px-4 text-right">876,450</td>
-                                                        <td className="py-3 px-4 text-right">700,230</td>
-                                                    </tr>
-                                                    <tr className="hover:bg-white/5 transition-colors">
-                                                        <td className="py-3 px-4 text-gray-300">Expenses</td>
-                                                        <td className="py-3 px-4 text-right font-medium">823,100</td>
-                                                        <td className="py-3 px-4 text-right">734,560</td>
-                                                        <td className="py-3 px-4 text-right">585,430</td>
-                                                    </tr>
-                                                    <tr className="hover:bg-white/5 transition-colors bg-white/[0.02]">
-                                                        <td className="py-3 px-4 text-white font-medium">Operating Profit</td>
-                                                        <td className="py-3 px-4 text-right text-white font-medium">159,340</td>
-                                                        <td className="py-3 px-4 text-right">141,890</td>
-                                                        <td className="py-3 px-4 text-right">114,800</td>
-                                                    </tr>
-                                                    <tr className="hover:bg-white/5 transition-colors">
-                                                        <td className="py-3 px-4 text-gray-300">Other Income</td>
-                                                        <td className="py-3 px-4 text-right font-medium">13,450</td>
-                                                        <td className="py-3 px-4 text-right">11,830</td>
-                                                        <td className="py-3 px-4 text-right">14,940</td>
-                                                    </tr>
-                                                    <tr className="hover:bg-white/5 transition-colors bg-white/[0.02]">
-                                                        <td className="py-3 px-4 text-white font-medium">Net Profit</td>
-                                                        <td className="py-3 px-4 text-right text-emerald-400 font-medium">79,020</td>
-                                                        <td className="py-3 px-4 text-right text-emerald-400">73,670</td>
-                                                        <td className="py-3 px-4 text-right text-emerald-400">67,845</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
+                                        <div className="flex gap-1 bg-[#1a2130]/60 p-1 rounded-lg">
+                                            {["annual", "quarterly"].map((p) => (
+                                                <button
+                                                    key={p}
+                                                    onClick={() => setPeriod(p)}
+                                                    className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${period === p ? "bg-[#2a3448] text-white" : "text-gray-400 hover:text-white"
+                                                        }`}
+                                                >
+                                                    {p}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
 
-                                    {/* Quarterly results */}
-                                    <div>
-                                        <h3 className="text-base font-semibold mb-4">Quarterly Results</h3>
-                                        <div className="border border-white/10 rounded-xl overflow-hidden">
+                                    {/* ── Statement Table ───────────────────────────────────────────── */}
+                                    <div className="border border-white/10 rounded-xl overflow-hidden">
+                                        {finReports.length === 0 ? (
+                                            <div className="text-gray-500 text-center py-10 text-xs">No data available</div>
+                                        ) : (
                                             <table className="w-full text-left">
                                                 <thead className="bg-[#1a2130]/80 border-b border-white/10">
                                                     <tr>
-                                                        <th className="py-3 px-4 font-medium text-gray-400">Quarter</th>
-                                                        <th className="py-3 px-4 font-medium text-gray-400 text-right">Revenue</th>
-                                                        <th className="py-3 px-4 font-medium text-gray-400 text-right">Profit</th>
-                                                        <th className="py-3 px-4 font-medium text-gray-400 text-right">EPS</th>
+                                                        <th className="py-3 px-4 font-medium text-gray-400 text-xs">Consolidated ($)</th>
+                                                        {finReports.map((r, i) => (
+                                                            <th key={i} className="py-3 px-4 font-medium text-gray-400 text-right text-xs">
+                                                                {colLabel(r)}
+                                                            </th>
+                                                        ))}
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-white/5">
-                                                    {[
-                                                        { q: "Q4 FY24", rev: "$2.1L Cr", profit: "$17,500 Cr", eps: "22.10" },
-                                                        { q: "Q3 FY24", rev: "$2.0L Cr", profit: "$16,800 Cr", eps: "21.20" },
-                                                        { q: "Q2 FY24", rev: "$2.0L Cr", profit: "$16,200 Cr", eps: "20.45" },
-                                                        { q: "Q1 FY24", rev: "$2.1L Cr", profit: "$17,950 Cr", eps: "22.65" },
-                                                    ].map(({ q, rev, profit, eps }) => (
-                                                        <tr key={q} className="hover:bg-white/5 transition-colors">
-                                                            <td className="py-3 px-4 text-gray-300">{q}</td>
-                                                            <td className="py-3 px-4 text-right">{rev}</td>
-                                                            <td className="py-3 px-4 text-right text-emerald-400">{profit}</td>
-                                                            <td className="py-3 px-4 text-right font-medium">{eps}</td>
+                                                    {finRows.map(({ label, field, bold, money = true }) => (
+                                                        <tr key={field} className={`hover:bg-white/5 transition-colors ${bold ? "bg-white/[0.02]" : ""}`}>
+                                                            <td className={`py-3 px-4 text-xs ${bold ? "text-white font-medium" : "text-gray-300"}`}>
+                                                                {label}
+                                                            </td>
+                                                            {finReports.map((r, i) => {
+                                                                const raw = r?.[field];
+                                                                const isEmpty = raw == null || raw === "None" || raw === "";
+                                                                const num = isEmpty ? null : parseFloat(raw);
+                                                                const display = isEmpty
+                                                                    ? <span className="text-gray-600">—</span>
+                                                                    : isNaN(num) ? raw
+                                                                        : money ? formatNumber(num)
+                                                                            : num.toLocaleString();
+                                                                return (
+                                                                    <td key={i} className={`py-3 px-4 text-right text-xs tabular-nums ${bold
+                                                                        ? i === 0 ? "text-white font-medium" : "text-white"
+                                                                        : i === 0 ? "text-gray-200 font-medium" : "text-gray-400"
+                                                                        }`}>
+                                                                        {display}
+                                                                    </td>
+                                                                );
+                                                            })}
                                                         </tr>
                                                     ))}
                                                 </tbody>
                                             </table>
+                                        )}
+                                    </div>
+
+                                    {/* ── Quarterly Results ─────────────────────────────────────────── */}
+                                    <div>
+                                        <h3 className="text-base font-semibold mb-4">Quarterly Results</h3>
+                                        <div className="border border-white/10 rounded-xl overflow-hidden">
+                                            {(fullFinancials?.incomeStatement?.quarterlyReports?.length ?? 0) === 0 ? (
+                                                <div className="text-gray-500 text-center py-10 text-xs">No quarterly data available</div>
+                                            ) : (
+                                                <table className="w-full text-left">
+                                                    <thead className="bg-[#1a2130]/80 border-b border-white/10">
+                                                        <tr>
+                                                            <th className="py-3 px-4 font-medium text-gray-400 text-xs">Quarter</th>
+                                                            <th className="py-3 px-4 font-medium text-gray-400 text-right text-xs">Revenue</th>
+                                                            <th className="py-3 px-4 font-medium text-gray-400 text-right text-xs">Net Profit</th>
+                                                            <th className="py-3 px-4 font-medium text-gray-400 text-right text-xs">EPS</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-white/5">
+                                                        {(fullFinancials?.incomeStatement?.quarterlyReports || []).slice(0, 8).map((r, i) => {
+                                                            const date = new Date(r.fiscalDateEnding || "");
+                                                            const q = Math.ceil((date.getMonth() + 1) / 3);
+                                                            const label = `Q${q} FY${String(date.getFullYear()).slice(2)}`;
+                                                            const rev = parseFloat(r.totalRevenue || 0);
+                                                            const profit = parseFloat(r.netIncome || 0);
+                                                            const eps = parseFloat(r.dilutedEPS || 0);
+                                                            return (
+                                                                <tr key={i} className="hover:bg-white/5 transition-colors">
+                                                                    <td className="py-3 px-4 text-gray-300 text-xs">{label}</td>
+                                                                    <td className="py-3 px-4 text-right text-xs tabular-nums">{rev ? formatNumber(rev) : "—"}</td>
+                                                                    <td className={`py-3 px-4 text-right text-xs tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                                        {profit ? formatNumber(profit) : "—"}
+                                                                    </td>
+                                                                    <td className="py-3 px-4 text-right text-xs font-medium tabular-nums">
+                                                                        {eps ? `$${eps.toFixed(2)}` : "—"}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Ratios */}
+                                    {/* ── Ratios ────────────────────────────────────────────────────── */}
                                     <div>
                                         <h3 className="text-base font-semibold mb-4">Financial Ratios</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
                                             {[
-                                                { label: "Debt/Equity", value: "0.45" },
-                                                { label: "Current Ratio", value: "1.32" },
-                                                { label: "Div Yield", value: "0.32%" },
-                                                { label: "Book Value", value: "$1,245" },
+                                                { label: "Debt/Equity", value: fullFinancials?.keyFinancials?.debtEquity != null ? fullFinancials.keyFinancials.debtEquity : "--" },
+                                                { label: "Current Ratio", value: fullFinancials?.keyFinancials?.currentRatio != null ? fullFinancials.keyFinancials.currentRatio : "--" },
+                                                { label: "Book Value", value: fullFinancials?.keyFinancials?.bookValue != null ? `$${fullFinancials.keyFinancials.bookValue}` : "--" },
+                                                { label: "Free Cash Flow", value: fullFinancials?.keyFinancials?.freeCashFlow ? formatNumber(fullFinancials.keyFinancials.freeCashFlow) : "--" },
                                             ].map(({ label, value }) => (
                                                 <div key={label} className="flex justify-between border-b border-white/5 pb-2">
                                                     <span className="text-gray-500">{label}</span>
@@ -890,6 +996,7 @@ export function StockPage() {
                                             ))}
                                         </div>
                                     </div>
+
                                 </div>
                             )}
 
@@ -1096,7 +1203,7 @@ export function StockPage() {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
