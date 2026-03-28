@@ -57,13 +57,11 @@ async function getMostActive() {
 
 async function getMarketMetrics(symbol) {
     try {
-        // 1️⃣ Get current stock profile for marketCap and price
         const keyRes = await axios.get(
-            `https://financialmodelingprep.com/stable/key-metrics?symbol=${symbol}&apikey=${FMP_API_KEY}`
+            `https://financialmodelingprep.com/stable/key-metrics?symbol=${symbol}&limit=1&apikey=${FMP_API_KEY}`
         );
         const key = keyRes.data?.[0] ?? {};
 
-        // 2️⃣ Get financial ratios for PE, PB, EPS, Dividend Yield
         const ratiosRes = await axios.get(
             `https://financialmodelingprep.com/stable/ratios?symbol=${symbol}&limit=1&period=FY&apikey=${FMP_API_KEY}`
         );
@@ -78,7 +76,7 @@ async function getMarketMetrics(symbol) {
             dividendYield: data.dividendYieldPercentage ?? null,
             roe: key.returnOnEquity ?? null,
             roa: key.returnOnAssets ?? null,
-            freeCashFlowYield: data.priceToFreeCashFlowRatio ?? null,
+            freeCashFlowYield: key.freeCashFlowYield ?? null,
         };
 
     } catch (err) {
