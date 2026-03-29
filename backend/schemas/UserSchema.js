@@ -29,6 +29,7 @@ const UserSchema = new mongoose.Schema({
         type: String,
         quantity: Number,
         price: Number,
+        status: String,
         date: { type: Date, default: Date.now }
       }
     ]

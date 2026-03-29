@@ -1,7 +1,7 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Dock from '../../components/Dock.jsx';
 import PillNav from '../../components/PillNav.jsx';
 import { Menu, MenuButton, MenuItems, MenuItem, Transition } from "@headlessui/react";
@@ -37,7 +37,6 @@ import {
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL;
-
 const buyStock = async ({ symbol, quantity, price }) => {
     try {
         const res = await axios.post(`${API}/orders/buy`, {
@@ -78,6 +77,7 @@ const sellStock = async ({ symbol, quantity, price }) => {
 
 export default function StockDashboard() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [activeTab, setActiveTab] = useState("explore");
     const [gainers, setGainers] = useState([]);
     const [losers, setLosers] = useState([]);
@@ -197,6 +197,12 @@ export default function StockDashboard() {
 
         return () => clearInterval(exploreInterval);
     }, []);
+
+    useEffect(() => {
+        if (location.state?.tab) {
+            setActiveTab(location.state.tab);
+        }
+    }, [location.state]);
 
 
     return (
@@ -344,6 +350,7 @@ export default function StockDashboard() {
                                             {gainers.map((stock, index) => (
                                                 <motion.div
                                                     key={stock.symbol}
+                                                    onClick={() => navigate(`/stock/${stock.symbol}`)}
                                                     initial={{ opacity: 0, x: -20 }}
                                                     animate={{ opacity: 1, x: 0 }}
                                                     transition={{ delay: index * 0.05, ease: "easeInOut" }}
@@ -383,6 +390,7 @@ export default function StockDashboard() {
                                             {losers.map((stock, index) => (
                                                 <motion.div
                                                     key={stock.symbol}
+                                                    onClick={() => navigate(`/stock/${stock.symbol}`)}
                                                     initial={{ opacity: 0, x: -20 }}
                                                     animate={{ opacity: 1, x: 0 }}
                                                     transition={{ delay: index * 0.05, ease: "easeInOut" }}

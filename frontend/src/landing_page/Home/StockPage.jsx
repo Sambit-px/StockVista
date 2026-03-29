@@ -28,9 +28,7 @@ const TIME_PERIODS = ["1D", "1W", "1M", "1Y", "3Y", "5Y"];
 const TABS = [
     { id: "overview", label: "Overview", icon: Info },
     { id: "news", label: "News", icon: Newspaper },
-    { id: "technicals", label: "Technicals", icon: LineChartIcon },
     { id: "financials", label: "Financials", icon: BarChart3 },
-    { id: "peers", label: "Peers", icon: Users },
 ];
 
 const PEER_STOCKS = [
@@ -65,7 +63,7 @@ const MOCK_STOCK = {
 export function StockPage() {
     const navigate = useNavigate();
     const { symbol } = useParams();
-
+    const [orderLoading, setOrderLoading] = useState(false);
     const [selectedPeriod, setSelectedPeriod] = useState("1D");
     const [activeTab, setActiveTab] = useState("overview");
     const [isInWatchlist, setIsInWatchlist] = useState(false);
@@ -125,14 +123,17 @@ export function StockPage() {
     ];
 
     // ✅ AFTER — just an empty formatNumber for now
-    function formatNumber(num) {
-        if (num === null || num === undefined) return "—"; // blank for missing
+    function formatNumber(num, isPercent = false) {
+        if (num === null || num === undefined) return "--"; // handle null/undefined
         const abs = Math.abs(num);
 
-        if (abs >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + "B";
-        if (abs >= 1_000_000) return (num / 1_000_000).toFixed(2) + "M";
-        if (abs >= 1_000) return (num / 1_000).toFixed(0) + "K"; // optional
-        return num.toLocaleString(); // small numbers
+        let formatted;
+        if (abs >= 1_000_000_000) formatted = (num / 1_000_000_000).toFixed(2) + "B";
+        else if (abs >= 1_000_000) formatted = (num / 1_000_000).toFixed(2) + "M";
+        else if (abs >= 1_000) formatted = (num / 1_000).toFixed(0) + "K";
+        else formatted = num.toLocaleString();
+
+        return isPercent ? `${formatted}%` : formatted;
     }
 
     const fetchStock = async () => {
@@ -234,6 +235,38 @@ export function StockPage() {
         }
     };
 
+    const handleOrder = async () => {
+        try {
+            setOrderLoading(true);
+            const endpoint = orderSide === "BUY"
+                ? `${API}/stock/${stockData.symbol}/buy`
+                : `${API}/stock/${stockData.symbol}/sell`;
+
+            await axios.post(
+                endpoint,
+                {
+                    quantity: Number(qty),
+                    price: stockData.price,
+                    name: stockData.name,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+                    },
+                }
+            );
+
+            // Redirect to /stocks and tell StockDashboard to open the orders tab
+            navigate("/stocks", { state: { tab: "orders" } });
+
+        } catch (err) {
+            console.error("Order failed:", err.response?.data || err.message);
+            // Optionally show a toast/error here
+        } finally {
+            setOrderLoading(false);
+        }
+    };
+
     function colLabel(report) {
         const d = report.date || report.fiscalDateEnding || "";
         if (!d) return "—";
@@ -273,6 +306,7 @@ export function StockPage() {
                 setfundamentals(fundamentalsRes);
                 setFinancials(financialsRes);
                 setMetrics(metricRes);
+
                 setFullFinancials(fullFinancialsRes);
             } catch (err) {
                 console.error(err);
@@ -530,31 +564,6 @@ export function StockPage() {
                             </div>
                         </div>
 
-                        {/* AI Insights Strip */}
-                        <div className="flex items-start gap-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-4 mb-8">
-                            <Sparkles className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <h4 className="text-sm font-semibold text-indigo-300">AI Analysis</h4>
-                                    <span className="text-[10px] uppercase tracking-wider font-bold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">
-                                        {isPositive ? "Bullish Signal" : "Bearish Signal"}
-                                    </span>
-                                </div>
-                                <p className="text-sm text-indigo-100/70 leading-relaxed">
-                                    Based on technical analysis and market trends, <strong>{stockData.symbol}</strong> is showing{" "}
-                                    {isPositive ? "strong bullish" : "bearish"} momentum. Trading{" "}
-                                    {isPositive ? "above" : "below"} 50-day EMA with MACD crossover. Volume analysis suggests{" "}
-                                    {isPositive ? "institutional buying" : "distribution pressure"}.
-                                    Next {isPositive ? "resistance" : "support"} at ${isPositive ? (stockData.price * 1.02).toFixed(0) : (stockData.price * 0.98).toFixed(0)}.
-                                </p>
-                                <div className="flex items-center gap-4 mt-2 text-xs text-indigo-200/60">
-                                    <span>Buy Signal: <strong className="text-emerald-400">78%</strong></span>
-                                    <span>Target: <strong className="text-white">${(stockData.price * 1.09).toFixed(0)}</strong></span>
-                                    <span>Stop Loss: <strong className="text-white">${(stockData.price * 0.94).toFixed(0)}</strong></span>
-                                </div>
-                            </div>
-                        </div>
-
                         {/* Tabs */}
                         <div className="flex gap-6 border-b border-white/10 mb-6 overflow-x-auto hide-scrollbar">
                             {TABS.map((tab) => (
@@ -638,44 +647,18 @@ export function StockPage() {
                                         <h3 className="text-base font-semibold mb-4">Fundamentals</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
                                             {[
-                                                { label: "Market Cap", value: formatNumber(metrics.marketCap) },
-                                                { label: "P/E Ratio", value: formatNumber(metrics.peRatio) },
-                                                { label: "P/B Ratio", value: formatNumber(metrics.pbRatio) },
-                                                { label: "Div Yield", value: `${formatNumber(metrics.dividendYield)}%` },
-                                                { label: "Volume", value: stockData.volume },
-                                                { label: "ROE", value: `${formatNumber(metrics.roe)}%` },
-                                                { label: "EPS (TTM)", value: "86.32" },
+                                                { label: "Market Cap", value: formatNumber(metrics?.marketCap) },
+                                                { label: "P/E Ratio", value: formatNumber(metrics?.peRatio) },
+                                                { label: "P/B Ratio", value: formatNumber(metrics?.pbRatio) },
+                                                { label: "Div Yield", value: `${formatNumber(metrics?.dividendYield)}%` },
+                                                { label: "Volume", value: stockData?.volume },
+                                                { label: "ROE", value: `${formatNumber(metrics?.roe)}%` },
+                                                { label: "EPS (TTM)", value: `${formatNumber(metrics?.eps)}%` },
                                                 { label: "Industry P/E", value: "--" },
                                             ].map(({ label, value }) => (
                                                 <div key={label} className="flex justify-between border-b border-white/5 pb-2">
                                                     <span className="text-gray-500">{label}</span>
                                                     <span className="font-medium">{value}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* About */}
-                                    <div>
-                                        <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-                                            <Building2 className="w-4 h-4 text-gray-400" /> About {stockData.name}
-                                        </h3>
-                                        <p className="text-gray-400 leading-relaxed">
-                                            {stockData.name} is one of India's largest conglomerates with business interests spanning across
-                                            energy, petrochemicals, natural gas, retail, telecommunications, mass media, and textiles.
-                                            It is one of the most profitable companies in India and the largest publicly traded company
-                                            by market capitalisation.
-                                        </p>
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-white/5">
-                                            {[
-                                                { label: "Founded", value: "1966" },
-                                                { label: "HQ", value: "Mumbai, India" },
-                                                { label: "CEO", value: "Mukesh Ambani" },
-                                                { label: "Employees", value: "347,000+" },
-                                            ].map(({ label, value }) => (
-                                                <div key={label} className="bg-[#1a2130]/30 p-3 rounded-lg">
-                                                    <div className="text-gray-500 text-xs mb-1">{label}</div>
-                                                    <div className="font-medium text-sm">{value}</div>
                                                 </div>
                                             ))}
                                         </div>
@@ -729,115 +712,6 @@ export function StockPage() {
                                 </div>
                             )}
 
-                            {/* TECHNICALS */}
-                            {activeTab === "technicals" && (
-                                <div className="space-y-8 text-sm">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        {/* Oscillators */}
-                                        <div>
-                                            <h3 className="text-base font-semibold mb-4">Oscillators</h3>
-                                            <div className="space-y-5">
-                                                <div>
-                                                    <div className="flex justify-between mb-1.5">
-                                                        <span className="text-gray-500">RSI (14)</span>
-                                                        <span className="font-medium text-emerald-400">62.4 (Bullish)</span>
-                                                    </div>
-                                                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: "62.4%" }} />
-                                                    </div>
-                                                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                                                        <span>Oversold (0)</span><span>Overbought (100)</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex justify-between py-2 border-b border-white/5">
-                                                    <span className="text-gray-500">MACD (12,26,9)</span>
-                                                    <span className="font-medium text-emerald-400">12.34 (Buy)</span>
-                                                </div>
-                                                <div className="flex justify-between py-2 border-b border-white/5">
-                                                    <span className="text-gray-500">Signal Line</span>
-                                                    <span className="font-medium">10.56</span>
-                                                </div>
-                                                <div className="flex justify-between py-2 border-b border-white/5">
-                                                    <span className="text-gray-500">Histogram</span>
-                                                    <span className="font-medium text-emerald-400">+1.78</span>
-                                                </div>
-                                                <div className="flex justify-between py-2">
-                                                    <span className="text-gray-500">Stochastic (14,3,3)</span>
-                                                    <span className="font-medium text-gray-300">75.2 (Neutral)</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Moving Averages */}
-                                        <div>
-                                            <h3 className="text-base font-semibold mb-4">Moving Averages</h3>
-                                            <div className="space-y-3">
-                                                {[
-                                                    { label: "SMA 20", value: "$2,398.50", signal: "Buy", color: "text-emerald-500 bg-emerald-500/10" },
-                                                    { label: "SMA 50", value: "$2,345.80", signal: "Buy", color: "text-emerald-500 bg-emerald-500/10" },
-                                                    { label: "SMA 200", value: "$2,234.20", signal: "Buy", color: "text-emerald-500 bg-emerald-500/10" },
-                                                    { label: "EMA 20", value: "$2,410.30", signal: "Buy", color: "text-emerald-500 bg-emerald-500/10" },
-                                                ].map(({ label, value, signal, color }) => (
-                                                    <div key={label} className="flex justify-between items-center p-3 rounded-lg bg-[#1a2130]/30 border border-white/5">
-                                                        <span className="text-gray-400">{label}</span>
-                                                        <span className="font-medium">{value}</span>
-                                                        <span className={`text-xs font-semibold px-2 py-1 rounded ${color}`}>{signal}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Support & Resistance */}
-                                    <div>
-                                        <h3 className="text-base font-semibold mb-4">Support &amp; Resistance Levels</h3>
-                                        <div className="rounded-xl border border-white/10 overflow-hidden">
-                                            {[
-                                                { label: "Resistance 3", value: "$2,545.00", color: "text-red-400" },
-                                                { label: "Resistance 2", value: "$2,510.00", color: "text-red-400" },
-                                                { label: "Resistance 1", value: "$2,478.90", color: "text-red-400" },
-                                            ].map(({ label, value, color }) => (
-                                                <div key={label} className="flex justify-between px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors">
-                                                    <span className="text-gray-400 text-sm">{label}</span>
-                                                    <span className={`font-semibold text-sm ${color}`}>{value}</span>
-                                                </div>
-                                            ))}
-                                            <div className="flex justify-between px-4 py-3 border-b border-white/5 bg-emerald-500/5">
-                                                <span className="font-semibold text-sm">Current Price</span>
-                                                <span className="font-bold text-sm text-emerald-400">${Number(stockData.price).toFixed(2)}</span>
-                                            </div>
-                                            {[
-                                                { label: "Support 1", value: "$2,435.20", color: "text-emerald-400" },
-                                                { label: "Support 2", value: "$2,400.00", color: "text-emerald-400" },
-                                                { label: "Support 3", value: "$2,365.00", color: "text-emerald-400" },
-                                            ].map(({ label, value, color }) => (
-                                                <div key={label} className="flex justify-between px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                                                    <span className="text-gray-400 text-sm">{label}</span>
-                                                    <span className={`font-semibold text-sm ${color}`}>{value}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Pivot Points */}
-                                    <div>
-                                        <h3 className="text-base font-semibold mb-4">Pivot Points (Daily)</h3>
-                                        <div className="grid grid-cols-3 gap-4">
-                                            {[
-                                                { label: "R1", value: "$2,489.30" },
-                                                { label: "Pivot", value: `$${Number(stockData.price).toFixed(2)}` },
-                                                { label: "S1", value: "$2,412.40" },
-                                            ].map(({ label, value }) => (
-                                                <div key={label} className="bg-[#1a2130]/50 p-4 rounded-lg text-center">
-                                                    <div className="text-gray-500 text-xs mb-1">{label}</div>
-                                                    <div className="font-medium">{value}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
                             {/* FINANCIALS */}
                             {activeTab === "financials" && (
                                 <div className="text-sm space-y-8">
@@ -849,8 +723,8 @@ export function StockPage() {
                                             {[
                                                 { label: "Revenue", value: `${formatNumber(fullFinancials?.incomeStatement?.highlights?.revenue)}` },
                                                 { label: "Net Profit", value: `${formatNumber(fullFinancials?.incomeStatement?.highlights?.netProfit)}` },
-                                                { label: "EPS (TTM)", value: `${formatNumber(metrics.eps)}%` },
-                                                { label: "ROE", value: `${formatNumber(metrics.roe)}%` },
+                                                { label: "EPS (TTM)", value: `${formatNumber(metrics?.eps)}%` },
+                                                { label: "ROE", value: `${formatNumber(metrics?.roe)}%` },
                                             ].map(({ label, value, yoy }) => (
                                                 <div key={label} className="bg-[#1a2130]/50 p-4 rounded-lg">
                                                     <div className="text-gray-500 mb-1 text-xs">{label}</div>
@@ -942,10 +816,10 @@ export function StockPage() {
                                         <h3 className="text-base font-semibold mb-4">Financial Ratios</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
                                             {[
-                                                { label: "Debt/Equity", value: formatNumber(metrics.DebtToEquity) },
-                                                { label: "Current Ratio", value: formatNumber(metrics.currentRatio) },
-                                                { label: "Book Value", value: formatNumber(metrics.bookValue) },
-                                                { label: "Free Cash Flow", value: formatNumber(metrics.freeCashFlowYield) },
+                                                { label: "Debt/Equity", value: formatNumber(metrics?.DebtToEquity) },
+                                                { label: "Current Ratio", value: formatNumber(metrics?.currentRatio) },
+                                                { label: "Book Value", value: formatNumber(metrics?.bookValue) },
+                                                { label: "Free Cash Flow", value: formatNumber(metrics?.freeCashFlowYield) },
                                             ].map(({ label, value }) => (
                                                 <div key={label} className="flex justify-between border-b border-white/5 pb-2">
                                                     <span className="text-gray-500">{label}</span>
@@ -955,89 +829,6 @@ export function StockPage() {
                                         </div>
                                     </div>
 
-                                </div>
-                            )}
-
-                            {/* PEERS */}
-                            {activeTab === "peers" && (
-                                <div className="space-y-8">
-                                    {/* Peer comparison table */}
-                                    <div>
-                                        <h3 className="text-base font-semibold mb-4">Peer Comparison</h3>
-                                        <div className="border border-white/10 rounded-xl overflow-hidden">
-                                            <table className="w-full text-left text-sm">
-                                                <thead className="bg-[#1a2130]/80 border-b border-white/10">
-                                                    <tr>
-                                                        <th className="py-3 px-4 font-medium text-gray-400">Company</th>
-                                                        <th className="py-3 px-4 font-medium text-gray-400 text-right">Price</th>
-                                                        <th className="py-3 px-4 font-medium text-gray-400 text-right">Change</th>
-                                                        <th className="py-3 px-4 font-medium text-gray-400 text-right hidden sm:table-cell">Market Cap</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-white/5">
-                                                    {/* Current stock highlighted */}
-                                                    <tr className="bg-emerald-500/5">
-                                                        <td className="py-3 px-4 font-semibold text-emerald-400">{stockData.symbol} <span className="text-[10px] font-normal text-gray-500 ml-1">You</span></td>
-                                                        <td className="py-3 px-4 text-right font-medium">${Number(stockData.price).toFixed(2)}</td>
-                                                        <td className={`py-3 px-4 text-right font-medium ${isPositive ? "text-emerald-500" : "text-red-500"}`}>
-                                                            {isPositive ? "+" : ""}{Number(stockData.changes?.[selectedPeriod]?.percent).toFixed(2)}%
-                                                        </td>
-                                                        <td className="py-3 px-4 text-right text-gray-400 hidden sm:table-cell">{stockData.marketCap}</td>
-                                                    </tr>
-                                                    {PEER_STOCKS.map((peer) => (
-                                                        <tr
-                                                            key={peer.symbol}
-                                                            className="hover:bg-white/5 transition-colors cursor-pointer"
-                                                            onClick={() => navigate(`/stock/${peer.symbol.toLowerCase()}`)}
-                                                        >
-                                                            <td className="py-3 px-4">
-                                                                <div className="font-medium text-white">{peer.symbol}</div>
-                                                                <div className="text-xs text-gray-500">{peer.name}</div>
-                                                            </td>
-                                                            <td className="py-3 px-4 text-right font-medium">${peer.price.toFixed(2)}</td>
-                                                            <td className={`py-3 px-4 text-right font-medium ${peer.change >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                                                                {peer.change >= 0 ? "+" : ""}{peer.changePercent.toFixed(2)}%
-                                                            </td>
-                                                            <td className="py-3 px-4 text-right text-gray-400 hidden sm:table-cell">{peer.marketCap}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                    {/* Analyst Ratings */}
-                                    <div>
-                                        <h3 className="text-base font-semibold mb-4">Analyst Ratings</h3>
-                                        <div className="space-y-4">
-                                            {[
-                                                { label: "Strong Buy", count: 12, pct: "60%", color: "bg-emerald-500" },
-                                                { label: "Buy", count: 5, pct: "25%", color: "bg-emerald-400" },
-                                                { label: "Hold", count: 3, pct: "15%", color: "bg-yellow-500" },
-                                                { label: "Sell", count: 0, pct: "0%", color: "bg-red-500" },
-                                            ].map(({ label, count, pct, color }) => (
-                                                <div key={label}>
-                                                    <div className="flex items-center justify-between mb-1.5 text-sm">
-                                                        <span className="text-gray-500">{label}</span>
-                                                        <span className="font-medium">{count}</span>
-                                                    </div>
-                                                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                                        <div className={`h-full ${color} rounded-full`} style={{ width: pct }} />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-between">
-                                            <div>
-                                                <div className="text-gray-500 text-xs mb-1">Consensus Target</div>
-                                                <div className="text-2xl font-semibold text-emerald-400">$2,750</div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-gray-500 text-xs mb-1">Upside Potential</div>
-                                                <div className="text-xl font-semibold text-emerald-400">+11.9%</div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1053,14 +844,18 @@ export function StockPage() {
                                 <div className="flex">
                                     <button
                                         onClick={() => setOrderSide("BUY")}
-                                        className={`flex-1 py-3.5 text-sm font-bold tracking-wider transition-colors ${orderSide === "BUY" ? "bg-emerald-500 text-white" : "bg-[#1a2130] text-gray-400 hover:text-white"
+                                        className={`flex-1 py-3.5 text-sm font-bold tracking-wider transition-colors ${orderSide === "BUY"
+                                            ? "bg-emerald-500 text-white"
+                                            : "bg-[#1a2130] text-gray-400 hover:text-white"
                                             }`}
                                     >
                                         BUY
                                     </button>
                                     <button
                                         onClick={() => setOrderSide("SELL")}
-                                        className={`flex-1 py-3.5 text-sm font-bold tracking-wider transition-colors ${orderSide === "SELL" ? "bg-red-500 text-white" : "bg-[#1a2130] text-gray-400 hover:text-white"
+                                        className={`flex-1 py-3.5 text-sm font-bold tracking-wider transition-colors ${orderSide === "SELL"
+                                            ? "bg-red-500 text-white"
+                                            : "bg-[#1a2130] text-gray-400 hover:text-white"
                                             }`}
                                     >
                                         SELL
@@ -1068,20 +863,6 @@ export function StockPage() {
                                 </div>
 
                                 <div className="p-5 space-y-5">
-                                    {/* Order Type */}
-                                    <div className="flex bg-[#1a2130] p-1 rounded-lg">
-                                        {(["MARKET", "LIMIT", "STOP-LOSS"]).map((type) => (
-                                            <button
-                                                key={type}
-                                                onClick={() => setOrderType(type)}
-                                                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${orderType === type ? "bg-white/10 text-white shadow-sm" : "text-gray-400 hover:text-gray-300"
-                                                    }`}
-                                            >
-                                                {type === "STOP-LOSS" ? "SL" : type.charAt(0) + type.slice(1).toLowerCase()}
-                                            </button>
-                                        ))}
-                                    </div>
-
                                     {/* Inputs */}
                                     <div className="space-y-4 text-sm">
                                         <div className="flex justify-between items-center">
@@ -1097,13 +878,10 @@ export function StockPage() {
                                         <div className="flex justify-between items-center">
                                             <label className="text-gray-400">Price</label>
                                             <input
-                                                type="number"
-                                                value={orderType === "MARKET" ? stockData.price : limitPrice}
-                                                onChange={(e) => setLimitPrice(e.target.value)}
-                                                disabled={orderType === "MARKET"}
-                                                placeholder={orderType === "MARKET" ? "Market" : "0.00"}
-                                                className={`w-24 bg-[#1a2130] border border-white/10 rounded py-1.5 px-3 text-right focus:outline-none focus:border-emerald-500/50 ${orderType === "MARKET" ? "text-gray-500 cursor-not-allowed" : "text-white"
-                                                    }`}
+                                                type="text"
+                                                value="Market Price"
+                                                disabled
+                                                className="w-24 bg-[#1a2130] border border-white/10 rounded py-1.5 px-3 text-right text-gray-500 cursor-not-allowed"
                                             />
                                         </div>
                                     </div>
@@ -1112,7 +890,9 @@ export function StockPage() {
                                     <div className="pt-4 border-t border-white/10 text-sm space-y-2">
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Margin Required</span>
-                                            <span className="font-semibold">${orderValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                                            <span className="font-semibold">
+                                                ${orderValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                                            </span>
                                         </div>
                                         <div className="flex justify-between text-xs">
                                             <span className="text-gray-500">Available Balance</span>
@@ -1127,12 +907,14 @@ export function StockPage() {
 
                                     {/* Submit */}
                                     <button
-                                        className={`w-full py-3.5 rounded-lg font-bold text-white shadow-lg transition-all active:scale-[0.98] ${orderSide === "BUY"
+                                        onClick={handleOrder}
+                                        disabled={orderLoading}
+                                        className={`w-full py-3.5 rounded-lg font-bold text-white shadow-lg transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed ${orderSide === "BUY"
                                             ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
                                             : "bg-red-500 hover:bg-red-600 shadow-red-500/20"
                                             }`}
                                     >
-                                        {orderSide} {stockData.symbol}
+                                        {orderLoading ? "Placing..." : `${orderSide} ${stockData.symbol}`}
                                     </button>
                                 </div>
                             </div>

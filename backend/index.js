@@ -310,39 +310,50 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
     const user = await UserModel.findById(req.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const existingStock = user.stocks.holdings.find(
-      stock => stock.symbol === symbol
-    );
+    // Get current stock price (assuming you have a function to fetch latest price)
+    const currentPrice = await getStockQuote(symbol); // implement this
+    const executed = price >= currentPrice; // true → execute immediately
 
-    if (existingStock) {
-      const newQuantity = existingStock.quantity + quantity;
+    if (executed) {
+      // Execute immediately → update holdings
+      const existingStock = user.stocks.holdings.find(
+        stock => stock.symbol === symbol
+      );
 
-      const totalCost =
-        existingStock.avgPrice * existingStock.quantity +
-        price * quantity;
+      if (existingStock) {
+        const newQuantity = existingStock.quantity + quantity;
+        const totalCost =
+          existingStock.avgPrice * existingStock.quantity +
+          price * quantity;
 
-      existingStock.quantity = newQuantity;
-      existingStock.avgPrice = totalCost / newQuantity;
-    } else {
-      user.stocks.holdings.push({
-        symbol,
-        name,
-        quantity,
-        avgPrice: price
-      });
+        existingStock.quantity = newQuantity;
+        existingStock.avgPrice = totalCost / newQuantity;
+      } else {
+        user.stocks.holdings.push({
+          symbol,
+          name,
+          quantity,
+          avgPrice: price
+        });
+      }
     }
 
+    // Add to orders in both cases
     user.stocks.orders.push({
       symbol,
       type: "BUY",
       quantity,
-      price
+      price,
+      status: executed ? "EXECUTED" : "PENDING",
+      placedAt: new Date()
     });
 
     await user.save();
 
     res.json({
-      message: "Stock bought successfully",
+      message: executed
+        ? "Stock bought successfully"
+        : "Order placed in pending orders",
       holdings: user.stocks.holdings,
       orders: user.stocks.orders
     });
@@ -365,37 +376,47 @@ app.post("/stock/:symbol/sell", authMiddleware, async (req, res) => {
     const user = await UserModel.findById(req.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const stock = user.stocks.holdings.find(
-      s => s.symbol === symbol
-    );
+    const stock = user.stocks.holdings.find(s => s.symbol === symbol);
 
     if (!stock) {
       return res.status(400).json({ error: "Stock not in holdings" });
     }
 
-    if (stock.quantity < quantity) {
-      return res.status(400).json({ error: "Not enough shares to sell" });
+    // Get current stock price (implement getStockQuote)
+    const currentPrice = await getStockQuote(symbol);
+    const executed = price <= currentPrice; // true → execute immediately
+
+    if (executed) {
+      // Reduce holdings
+      if (stock.quantity < quantity) {
+        return res.status(400).json({ error: "Not enough shares to sell" });
+      }
+
+      stock.quantity -= quantity;
+
+      if (stock.quantity === 0) {
+        user.stocks.holdings = user.stocks.holdings.filter(
+          s => s.symbol !== symbol
+        );
+      }
     }
 
-    stock.quantity -= quantity;
-
-    if (stock.quantity === 0) {
-      user.stocks.holdings = user.stocks.holdings.filter(
-        s => s.symbol !== symbol
-      );
-    }
-
+    // Add to orders
     user.stocks.orders.push({
       symbol,
       type: "SELL",
       quantity,
-      price
+      price,
+      status: executed ? "EXECUTED" : "PENDING",
+      placedAt: new Date()
     });
 
     await user.save();
 
     res.json({
-      message: "Stock sold successfully",
+      message: executed
+        ? "Stock sold successfully"
+        : "Sell order placed in pending orders",
       holdings: user.stocks.holdings,
       orders: user.stocks.orders
     });
