@@ -45,11 +45,10 @@ async function getFinancials(symbol) {
     } catch (err) {
         console.error("getFinancials error:", err.message);
         return {
-            incomeStatement: { annualReports: [], quarterlyReports: [] },
-            balanceSheet: { annualReports: [], quarterlyReports: [] },
-            cashFlowStatement: { annualReports: [], quarterlyReports: [] },
-            ratios: {},
-            marketMetrics: { note: "No data available" },
+            incomeStatement: income,
+            balanceSheet: balance,
+            cashFlow,
+            ratios,
         };
     }
 }
