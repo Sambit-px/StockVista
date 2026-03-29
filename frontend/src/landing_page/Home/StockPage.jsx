@@ -312,11 +312,19 @@ export function StockPage() {
     useEffect(() => {
         if (!fullFinancials) return;
 
+        // ── DEBUG — remove once working ──
+        console.log("fullFinancials:", fullFinancials);
+        console.log("incomeStatement:", fullFinancials.incomeStatement);
+        console.log("annualReports:", fullFinancials.incomeStatement?.annualReports);
+        // ────────────────────────────────
+
         const sourceMap = {
             income: period === "annual" ? fullFinancials.incomeStatement?.annualReports : fullFinancials.incomeStatement?.quarterlyReports,
             balance: period === "annual" ? fullFinancials.balanceSheet?.annualReports : fullFinancials.balanceSheet?.quarterlyReports,
             cash: period === "annual" ? fullFinancials.cashFlow?.annualReports : fullFinancials.cashFlow?.quarterlyReports,
         };
+
+        console.log("sourceMap[finSubTab]:", sourceMap[finSubTab]); // ── DEBUG
 
         setFinReports((sourceMap[finSubTab] || []).slice(0, 5));
         setFinRows({ income: INCOME_ROWS, balance: BALANCE_ROWS, cash: CASH_ROWS }[finSubTab]);

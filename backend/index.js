@@ -12,7 +12,7 @@ const authRoutes = require("./routes/auth");
 const { getStockQuote, searchStocks, getStockFundamentals, getStockFinancials, getCompanyNews } = require("./services/finnhub");
 const { getFinancials } = require("./services/alphaVantage");
 const { getStockData } = require("./services/twelveData");
-const { getTopGainers, getTopLosers, getMostActive, getMarketMetrics } = require("./services/fmp");
+const { getTopGainers, getTopLosers, getMostActive, getMarketMetrics, getIncomeStatement, getBalanceSheet, getCashFlow } = require("./services/fmp");
 
 const PORT = process.env.PORT || 3002;
 const uri = process.env.MONGO_URL;
@@ -151,24 +151,34 @@ app.get("/stock/:symbol", async (req, res) => {
 });
 
 // GET /financials/full/:symbol
-app.get("/financials/full/:symbol", async (req, res) => {
+async function getFinancials(symbol) {
   try {
-    const { symbol } = req.params;
-    const upperSymbol = symbol.toUpperCase();
+    const [income, balance, cash] = await Promise.all([
+      getIncomeStatement(symbol),
+      getBalanceSheet(symbol),
+      getCashFlow(symbol),
+    ]);
 
-    // Fetch everything in one call
-    const financials = await getFinancials(upperSymbol);
+    return {
+      incomeStatement: {
+        annualReports: income.annualReports,
+        quarterlyReports: income.quarterlyReports,
+      },
+      balanceSheet: {
+        annualReports: balance.annualReports,
+        quarterlyReports: balance.quarterlyReports,
+      },
+      cashFlow: {
+        annualReports: cash.annualReports,
+        quarterlyReports: cash.quarterlyReports,
+      }
+    };
 
-    if (!financials) {
-      return res.status(404).json({ error: "Financials not found" });
-    }
-
-    res.json(financials);
   } catch (err) {
-    console.error("Full financials error:", err.message);
-    res.status(500).json({ error: "Failed to fetch full financials" });
+    console.error("Financials aggregation error:", err.message);
+    return null;
   }
-});
+}
 
 app.get("/market-metrics/:symbol", async (req, res) => {
   try {

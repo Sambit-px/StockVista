@@ -85,9 +85,60 @@ async function getMarketMetrics(symbol) {
     }
 }
 
+async function getIncomeStatement(symbol) {
+    try {
+        const res = await axios.get(
+            `https://financialmodelingprep.com/stable/income-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`
+        );
+
+        return {
+            annualReports: res.data?.filter(r => r.period === "FY") ?? [],
+            quarterlyReports: res.data?.filter(r => r.period === "Q") ?? []
+        };
+    } catch (err) {
+        console.error("Income statement error:", err.message);
+        return { annualReports: [], quarterlyReports: [] };
+    }
+}
+
+async function getBalanceSheet(symbol) {
+    try {
+        const res = await axios.get(
+            `https://financialmodelingprep.com/stable/balance-sheet-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`
+        );
+
+        return {
+            annualReports: res.data?.filter(r => r.period === "FY") ?? [],
+            quarterlyReports: res.data?.filter(r => r.period === "Q") ?? []
+        };
+    } catch (err) {
+        console.error("Balance sheet error:", err.message);
+        return { annualReports: [], quarterlyReports: [] };
+    }
+}
+
+async function getCashFlow(symbol) {
+    try {
+        const res = await axios.get(
+            `https://financialmodelingprep.com/stable/cash-flow-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`
+        );
+
+        return {
+            annualReports: res.data?.filter(r => r.period === "FY") ?? [],
+            quarterlyReports: res.data?.filter(r => r.period === "Q") ?? []
+        };
+    } catch (err) {
+        console.error("Cash flow error:", err.message);
+        return { annualReports: [], quarterlyReports: [] };
+    }
+}
+
 module.exports = {
     getTopGainers,
     getTopLosers,
     getMostActive,
-    getMarketMetrics
+    getMarketMetrics,
+    getIncomeStatement,
+    getBalanceSheet,
+    getCashFlow
 };
