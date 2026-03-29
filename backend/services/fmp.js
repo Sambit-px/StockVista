@@ -94,12 +94,26 @@ async function getIncomeStatement(symbol) {
             `https://financialmodelingprep.com/stable/income-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`
         );
 
+        const annualReports = res.data?.filter(r => r.period === "FY") ?? [];
+        const latest = annualReports[0] ?? {};
+
         return {
-            annualReports: res.data?.filter(r => r.period === "FY") ?? []
+            annualReports,
+            highlights: {
+                revenue: latest.revenue ?? null,
+                netProfit: latest.netIncome ?? null,
+            }
         };
+
     } catch (err) {
         console.error("Income statement error:", err.message);
-        return { annualReports: [] };
+        return {
+            annualReports: [],
+            highlights: {
+                revenue: null,
+                netProfit: null,
+            }
+        };
     }
 }
 

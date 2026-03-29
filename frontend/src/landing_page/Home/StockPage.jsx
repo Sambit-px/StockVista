@@ -938,10 +938,10 @@ export function StockPage() {
                                         <h3 className="text-base font-semibold mb-4">Financial Ratios</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
                                             {[
-                                                { label: "Debt/Equity", value: metrics.debtToEquity },
-                                                { label: "Current Ratio", value: fullFinancials?.keyFinancials?.currentRatio != null ? fullFinancials.keyFinancials.currentRatio : "--" },
-                                                { label: "Book Value", value: fullFinancials?.keyFinancials?.bookValue != null ? `$${fullFinancials.keyFinancials.bookValue}` : "--" },
-                                                { label: "Free Cash Flow", value: fullFinancials?.keyFinancials?.freeCashFlow ? formatNumber(fullFinancials.keyFinancials.freeCashFlow) : "--" },
+                                                { label: "Debt/Equity", value: formatNumber(metrics.DebtToEquity) },
+                                                { label: "Current Ratio", value: formatNumber(metrics.currentRatio) },
+                                                { label: "Book Value", value: formatNumber(metrics.bookValue) },
+                                                { label: "Free Cash Flow", value: formatNumber(metrics.freeCashFlowYield) },
                                             ].map(({ label, value }) => (
                                                 <div key={label} className="flex justify-between border-b border-white/5 pb-2">
                                                     <span className="text-gray-500">{label}</span>
