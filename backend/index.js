@@ -9,8 +9,7 @@ const UserModel = require("./model/UserModel");
 const authMiddleware = require("./middleware/auth.js");
 const authRoutes = require("./routes/auth");
 
-const { getStockQuote, searchStocks, getStockFundamentals, getStockFinancials, getCompanyNews } = require("./services/finnhub");
-const { getFinancials } = require("./services/alphaVantage");
+const { getStockQuote, searchStocks, getStockFundamentals, getFinancials } = require("./services/fmp.js")
 const { getStockData } = require("./services/twelveData");
 const { getTopGainers, getTopLosers, getMostActive, getMarketMetrics, getIncomeStatement, getBalanceSheet, getCashFlow } = require("./services/fmp");
 
@@ -156,17 +155,9 @@ app.get("/financials/full/:symbol", async (req, res) => {
     const { symbol } = req.params;
     const upperSymbol = symbol.toUpperCase();
 
-    const [income, balance, cash] = await Promise.all([
-      getIncomeStatement(upperSymbol),
-      getBalanceSheet(upperSymbol),
-      getCashFlow(upperSymbol)
-    ]);
+    const financials = await getFinancials(upperSymbol);
 
-    res.json({
-      incomeStatement: income,
-      balanceSheet: balance,
-      cashFlow: cash
-    });
+    res.json(financials);
 
   } catch (err) {
     console.error("Full financials error:", err.message);

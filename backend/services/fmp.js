@@ -85,51 +85,39 @@ async function getMarketMetrics(symbol) {
     }
 }
 
-async function getIncomeStatement(symbol) {
+async function getFinancials(symbol) {
     try {
-        const res = await axios.get(
-            `https://financialmodelingprep.com/stable/income-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`
-        );
+        const [incomeRes, balanceRes, cashRes] = await Promise.all([
+            axios.get(`https://financialmodelingprep.com/stable/income-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`),
+            axios.get(`https://financialmodelingprep.com/stable/balance-sheet-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`),
+            axios.get(`https://financialmodelingprep.com/stable/cash-flow-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`)
+        ]);
 
         return {
-            annualReports: res.data?.filter(r => r.period === "FY") ?? [],
-            quarterlyReports: res.data?.filter(r => r.period === "Q") ?? []
+            incomeStatement: {
+                annualReports: (incomeRes.data ?? [])
+                    .filter(r => r.period === "FY")
+                    .slice(0, 5)
+            },
+            balanceSheet: {
+                annualReports: (balanceRes.data ?? [])
+                    .filter(r => r.period === "FY")
+                    .slice(0, 5)
+            },
+            cashFlow: {
+                annualReports: (cashRes.data ?? [])
+                    .filter(r => r.period === "FY")
+                    .slice(0, 5)
+            }
         };
+
     } catch (err) {
-        console.error("Income statement error:", err.message);
-        return { annualReports: [], quarterlyReports: [] };
-    }
-}
-
-async function getBalanceSheet(symbol) {
-    try {
-        const res = await axios.get(
-            `https://financialmodelingprep.com/stable/balance-sheet-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`
-        );
-
+        console.error("Financials fetch error:", err.message);
         return {
-            annualReports: res.data?.filter(r => r.period === "FY") ?? [],
-            quarterlyReports: res.data?.filter(r => r.period === "Q") ?? []
+            incomeStatement: { annualReports: [] },
+            balanceSheet: { annualReports: [] },
+            cashFlow: { annualReports: [] }
         };
-    } catch (err) {
-        console.error("Balance sheet error:", err.message);
-        return { annualReports: [], quarterlyReports: [] };
-    }
-}
-
-async function getCashFlow(symbol) {
-    try {
-        const res = await axios.get(
-            `https://financialmodelingprep.com/stable/cash-flow-statement?symbol=${symbol}&apikey=${FMP_API_KEY}`
-        );
-
-        return {
-            annualReports: res.data?.filter(r => r.period === "FY") ?? [],
-            quarterlyReports: res.data?.filter(r => r.period === "Q") ?? []
-        };
-    } catch (err) {
-        console.error("Cash flow error:", err.message);
-        return { annualReports: [], quarterlyReports: [] };
     }
 }
 
@@ -138,7 +126,5 @@ module.exports = {
     getTopLosers,
     getMostActive,
     getMarketMetrics,
-    getIncomeStatement,
-    getBalanceSheet,
-    getCashFlow
+    getFinancials
 };

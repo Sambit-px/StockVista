@@ -235,12 +235,6 @@ export function StockPage() {
     function colLabel(report) {
         const d = report.date || report.fiscalDateEnding || "";
         if (!d) return "—";
-
-        if (period === "quarterly") {
-            const date = new Date(d);
-            const q = Math.ceil((date.getMonth() + 1) / 3);
-            return `Q${q} '${String(date.getFullYear()).slice(2)}`;
-        }
         return d.slice(0, 4);
     }
 
@@ -322,9 +316,9 @@ export function StockPage() {
         // ────────────────────────────────
 
         const sourceMap = {
-            income: period === "annual" ? fullFinancials.incomeStatement?.annualReports : fullFinancials.incomeStatement?.quarterlyReports,
-            balance: period === "annual" ? fullFinancials.balanceSheet?.annualReports : fullFinancials.balanceSheet?.quarterlyReports,
-            cash: period === "annual" ? fullFinancials.cashFlow?.annualReports : fullFinancials.cashFlow?.quarterlyReports,
+            income: fullFinancials.incomeStatement?.annualReports,
+            balance: fullFinancials.balanceSheet?.annualReports,
+            cash: fullFinancials.cashFlow?.annualReports,
         };
 
         console.log("sourceMap[finSubTab]:", sourceMap[finSubTab]); // ── DEBUG
@@ -887,18 +881,7 @@ export function StockPage() {
                                                 </button>
                                             ))}
                                         </div>
-                                        <div className="flex gap-1 bg-[#1a2130]/60 p-1 rounded-lg">
-                                            {["annual", "quarterly"].map((p) => (
-                                                <button
-                                                    key={p}
-                                                    onClick={() => setPeriod(p)}
-                                                    className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${period === p ? "bg-[#2a3448] text-white" : "text-gray-400 hover:text-white"
-                                                        }`}
-                                                >
-                                                    {p}
-                                                </button>
-                                            ))}
-                                        </div>
+
                                     </div>
 
                                     {/* ── Statement Table ───────────────────────────────────────────── */}
@@ -948,49 +931,7 @@ export function StockPage() {
                                         )}
                                     </div>
 
-                                    {/* ── Quarterly Results ─────────────────────────────────────────── */}
-                                    <div>
-                                        <h3 className="text-base font-semibold mb-4">Quarterly Results</h3>
-                                        <div className="border border-white/10 rounded-xl overflow-hidden">
-                                            {(fullFinancials?.incomeStatement?.quarterlyReports?.length ?? 0) === 0 ? (
-                                                <div className="text-gray-500 text-center py-10 text-xs">No quarterly data available</div>
-                                            ) : (
-                                                <table className="w-full text-left">
-                                                    <thead className="bg-[#1a2130]/80 border-b border-white/10">
-                                                        <tr>
-                                                            <th className="py-3 px-4 font-medium text-gray-400 text-xs">Quarter</th>
-                                                            <th className="py-3 px-4 font-medium text-gray-400 text-right text-xs">Revenue</th>
-                                                            <th className="py-3 px-4 font-medium text-gray-400 text-right text-xs">Net Profit</th>
-                                                            <th className="py-3 px-4 font-medium text-gray-400 text-right text-xs">EPS</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-white/5">
-                                                        {(fullFinancials?.incomeStatement?.quarterlyReports || []).slice(0, 8).map((r, i) => {
-                                                            const date = new Date(r.date || "");
-                                                            const q = Math.ceil((date.getMonth() + 1) / 3);
-                                                            const label = `Q${q} FY${String(date.getFullYear()).slice(2)}`;
 
-                                                            const rev = parseFloat(r.revenue || 0);
-                                                            const profit = parseFloat(r.netIncome || 0);
-                                                            const eps = parseFloat(r.eps || 0);
-                                                            return (
-                                                                <tr key={i} className="hover:bg-white/5 transition-colors">
-                                                                    <td className="py-3 px-4 text-gray-300 text-xs">{label}</td>
-                                                                    <td className="py-3 px-4 text-right text-xs tabular-nums">{rev ? formatNumber(rev) : "—"}</td>
-                                                                    <td className={`py-3 px-4 text-right text-xs tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                                                        {profit ? formatNumber(profit) : "—"}
-                                                                    </td>
-                                                                    <td className="py-3 px-4 text-right text-xs font-medium tabular-nums">
-                                                                        {eps ? `$${eps.toFixed(2)}` : "—"}
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            )}
-                                        </div>
-                                    </div>
 
                                     {/* ── Ratios ────────────────────────────────────────────────────── */}
                                     <div>
