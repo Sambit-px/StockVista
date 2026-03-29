@@ -151,34 +151,28 @@ app.get("/stock/:symbol", async (req, res) => {
 });
 
 // GET /financials/full/:symbol
-async function getFinancials(symbol) {
+app.get("/financials/full/:symbol", async (req, res) => {
   try {
+    const { symbol } = req.params;
+    const upperSymbol = symbol.toUpperCase();
+
     const [income, balance, cash] = await Promise.all([
-      getIncomeStatement(symbol),
-      getBalanceSheet(symbol),
-      getCashFlow(symbol),
+      getIncomeStatement(upperSymbol),
+      getBalanceSheet(upperSymbol),
+      getCashFlow(upperSymbol)
     ]);
 
-    return {
-      incomeStatement: {
-        annualReports: income.annualReports,
-        quarterlyReports: income.quarterlyReports,
-      },
-      balanceSheet: {
-        annualReports: balance.annualReports,
-        quarterlyReports: balance.quarterlyReports,
-      },
-      cashFlow: {
-        annualReports: cash.annualReports,
-        quarterlyReports: cash.quarterlyReports,
-      }
-    };
+    res.json({
+      incomeStatement: income,
+      balanceSheet: balance,
+      cashFlow: cash
+    });
 
   } catch (err) {
-    console.error("Financials aggregation error:", err.message);
-    return null;
+    console.error("Full financials error:", err.message);
+    res.status(500).json({ error: "Failed to fetch full financials" });
   }
-}
+});
 
 app.get("/market-metrics/:symbol", async (req, res) => {
   try {

@@ -90,8 +90,9 @@ export function StockPage() {
     const [finRows, setFinRows] = useState([]);
     const key = financials?.keyFinancials;
     const income = financials?.incomeStatement;
+
     const INCOME_ROWS = [
-        { label: "Total Revenue", field: "totalRevenue" },
+        { label: "Revenue", field: "revenue", bold: true },
         { label: "Cost of Revenue", field: "costOfRevenue" },
         { label: "Gross Profit", field: "grossProfit", bold: true },
         { label: "Operating Expenses", field: "operatingExpenses" },
@@ -99,28 +100,29 @@ export function StockPage() {
         { label: "EBITDA", field: "ebitda" },
         { label: "Interest Expense", field: "interestExpense" },
         { label: "Net Income", field: "netIncome", bold: true },
-        { label: "EPS (Diluted)", field: "dilutedEPS", money: false },
+        { label: "EPS (Diluted)", field: "eps", money: false },
     ];
+
 
     const BALANCE_ROWS = [
         { label: "Total Assets", field: "totalAssets", bold: true },
         { label: "Current Assets", field: "totalCurrentAssets" },
-        { label: "Cash & Equivalents", field: "cashAndCashEquivalentsAtCarryingValue" },
+        { label: "Cash & Equivalents", field: "cashAndCashEquivalents" },
         { label: "Total Liabilities", field: "totalLiabilities", bold: true },
         { label: "Current Liabilities", field: "totalCurrentLiabilities" },
         { label: "Long-term Debt", field: "longTermDebt" },
-        { label: "Shareholder Equity", field: "totalShareholderEquity", bold: true },
+        { label: "Shareholder Equity", field: "totalStockholdersEquity", bold: true },
         { label: "Shares Outstanding", field: "commonStockSharesOutstanding", money: false },
     ];
 
     const CASH_ROWS = [
-        { label: "Operating Cash Flow", field: "operatingCashflow", bold: true },
-        { label: "Capital Expenditures", field: "capitalExpenditures" },
-        { label: "Investing Cash Flow", field: "cashflowFromInvestment" },
-        { label: "Financing Cash Flow", field: "cashflowFromFinancing" },
-        { label: "Net Change in Cash", field: "changeInCash" },
+        { label: "Operating Cash Flow", field: "operatingCashFlow", bold: true },
+        { label: "Capital Expenditures", field: "capitalExpenditure" },
+        { label: "Investing Cash Flow", field: "netCashUsedForInvestingActivites" },
+        { label: "Financing Cash Flow", field: "netCashUsedProvidedByFinancingActivities" },
+        { label: "Net Change in Cash", field: "netChangeInCash" },
         { label: "Free Cash Flow", field: "freeCashFlow" },
-        { label: "Dividend Payout", field: "dividendPayout" },
+        { label: "Dividends Paid", field: "dividendsPaid" },
     ];
 
     // ✅ AFTER — just an empty formatNumber for now
@@ -231,8 +233,9 @@ export function StockPage() {
     };
 
     function colLabel(report) {
-        const d = report.fiscalDateEnding || "";
+        const d = report.date || report.fiscalDateEnding || "";
         if (!d) return "—";
+
         if (period === "quarterly") {
             const date = new Date(d);
             const q = Math.ceil((date.getMonth() + 1) / 3);
@@ -326,7 +329,8 @@ export function StockPage() {
 
         console.log("sourceMap[finSubTab]:", sourceMap[finSubTab]); // ── DEBUG
 
-        setFinReports((sourceMap[finSubTab] || []).slice(0, 5));
+        const reports = sourceMap[finSubTab] || [];
+        setFinReports(Array.isArray(reports) ? reports.slice(0, 5) : []);
         setFinRows({ income: INCOME_ROWS, balance: BALANCE_ROWS, cash: CASH_ROWS }[finSubTab]);
 
     }, [fullFinancials, finSubTab, period]);
@@ -962,12 +966,13 @@ export function StockPage() {
                                                     </thead>
                                                     <tbody className="divide-y divide-white/5">
                                                         {(fullFinancials?.incomeStatement?.quarterlyReports || []).slice(0, 8).map((r, i) => {
-                                                            const date = new Date(r.fiscalDateEnding || "");
+                                                            const date = new Date(r.date || "");
                                                             const q = Math.ceil((date.getMonth() + 1) / 3);
                                                             const label = `Q${q} FY${String(date.getFullYear()).slice(2)}`;
-                                                            const rev = parseFloat(r.totalRevenue || 0);
+
+                                                            const rev = parseFloat(r.revenue || 0);
                                                             const profit = parseFloat(r.netIncome || 0);
-                                                            const eps = parseFloat(r.dilutedEPS || 0);
+                                                            const eps = parseFloat(r.eps || 0);
                                                             return (
                                                                 <tr key={i} className="hover:bg-white/5 transition-colors">
                                                                     <td className="py-3 px-4 text-gray-300 text-xs">{label}</td>
