@@ -112,25 +112,27 @@ export function StockPage() {
         { label: "Current Liabilities", field: "totalCurrentLiabilities" },
         { label: "Long-term Debt", field: "longTermDebt" },
         { label: "Shareholder Equity", field: "totalStockholdersEquity", bold: true },
-        { label: "Shares Outstanding", field: "commonStockSharesOutstanding", money: false },
-    ];
+    ]
 
     const CASH_ROWS = [
         { label: "Operating Cash Flow", field: "operatingCashFlow", bold: true },
         { label: "Capital Expenditures", field: "capitalExpenditure" },
-        { label: "Investing Cash Flow", field: "netCashUsedForInvestingActivites" },
-        { label: "Financing Cash Flow", field: "netCashUsedProvidedByFinancingActivities" },
+        { label: "Investing Cash Flow", field: "netCashProvidedByInvestingActivities" },
+        { label: "Financing Cash Flow", field: "netCashProvidedByFinancingActivities" },
         { label: "Net Change in Cash", field: "netChangeInCash" },
         { label: "Free Cash Flow", field: "freeCashFlow" },
-        { label: "Dividends Paid", field: "dividendsPaid" },
+        { label: "Dividends Paid", field: "netDividendsPaid" },
     ];
 
     // ✅ AFTER — just an empty formatNumber for now
     function formatNumber(num) {
-        if (num === null || num === undefined) return "N/A";
-        if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + "B";
-        if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + "M";
-        return num.toLocaleString();
+        if (num === null || num === undefined) return "—"; // blank for missing
+        const abs = Math.abs(num);
+
+        if (abs >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + "B";
+        if (abs >= 1_000_000) return (num / 1_000_000).toFixed(2) + "M";
+        if (abs >= 1_000) return (num / 1_000).toFixed(0) + "K"; // optional
+        return num.toLocaleString(); // small numbers
     }
 
     const fetchStock = async () => {
@@ -845,10 +847,10 @@ export function StockPage() {
                                         <h3 className="text-base font-semibold mb-4">Key Financials (TTM)</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                             {[
-                                                { label: "Revenue", value: fullFinancials?.keyFinancials?.revenue ? formatNumber(fullFinancials.keyFinancials.revenue) : "--", yoy: fullFinancials?.keyFinancials?.revenueGrowth ?? null },
-                                                { label: "Net Profit", value: fullFinancials?.keyFinancials?.netProfit ? formatNumber(fullFinancials.keyFinancials.netProfit) : "--", yoy: fullFinancials?.keyFinancials?.profitGrowth ?? null },
-                                                { label: "EPS (TTM)", value: fullFinancials?.keyFinancials?.eps != null ? `$${fullFinancials.keyFinancials.eps}` : "--", yoy: null },
-                                                { label: "ROE", value: fullFinancials?.keyFinancials?.roe != null ? `${fullFinancials.keyFinancials.roe}%` : "--", yoy: null },
+                                                { label: "Revenue", value: `${formatNumber(fullFinancials?.incomeStatement?.highlights?.revenue)}` },
+                                                { label: "Net Profit", value: `${formatNumber(fullFinancials?.incomeStatement?.highlights?.netProfit)}` },
+                                                { label: "EPS (TTM)", value: `${formatNumber(metrics.eps)}%` },
+                                                { label: "ROE", value: `${formatNumber(metrics.roe)}%` },
                                             ].map(({ label, value, yoy }) => (
                                                 <div key={label} className="bg-[#1a2130]/50 p-4 rounded-lg">
                                                     <div className="text-gray-500 mb-1 text-xs">{label}</div>
@@ -912,8 +914,10 @@ export function StockPage() {
                                                                 const num = isEmpty ? null : parseFloat(raw);
                                                                 const display = isEmpty
                                                                     ? <span className="text-gray-600">—</span>
-                                                                    : isNaN(num) ? raw
-                                                                        : money ? formatNumber(num)
+                                                                    : isNaN(num)
+                                                                        ? raw
+                                                                        : money
+                                                                            ? formatNumber(num)
                                                                             : num.toLocaleString();
                                                                 return (
                                                                     <td key={i} className={`py-3 px-4 text-right text-xs tabular-nums ${bold
