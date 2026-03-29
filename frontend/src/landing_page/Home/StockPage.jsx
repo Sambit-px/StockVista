@@ -938,7 +938,7 @@ export function StockPage() {
                                         <h3 className="text-base font-semibold mb-4">Financial Ratios</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
                                             {[
-                                                { label: "Debt/Equity", value: fullFinancials?.keyFinancials?.debtEquity != null ? fullFinancials.keyFinancials.debtEquity : "--" },
+                                                { label: "Debt/Equity", value: metrics.debtToEquity },
                                                 { label: "Current Ratio", value: fullFinancials?.keyFinancials?.currentRatio != null ? fullFinancials.keyFinancials.currentRatio : "--" },
                                                 { label: "Book Value", value: fullFinancials?.keyFinancials?.bookValue != null ? `$${fullFinancials.keyFinancials.bookValue}` : "--" },
                                                 { label: "Free Cash Flow", value: fullFinancials?.keyFinancials?.freeCashFlow ? formatNumber(fullFinancials.keyFinancials.freeCashFlow) : "--" },

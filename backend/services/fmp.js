@@ -76,6 +76,9 @@ async function getMarketMetrics(symbol) {
             dividendYield: data.dividendYieldPercentage ?? null,
             roe: key.returnOnEquity ?? null,
             roa: key.returnOnAssets ?? null,
+            bookValue: ratios.bookValuePerShare,
+            currentRatio: ratios.currentRatio,
+            DebtToEquity: ratios.debtToEquityRatio,
             freeCashFlowYield: key.freeCashFlowYield ?? null,
         };
 
