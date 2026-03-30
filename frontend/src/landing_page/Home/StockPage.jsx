@@ -72,8 +72,9 @@ export function StockPage() {
     const [metrics, setMetrics] = useState([]);
     const [orderType, setOrderType] = useState("MARKET");
     const [qty, setQty] = useState("1");
-    const [limitPrice, setLimitPrice] = useState("");
 
+    const [priceType, setPriceType] = useState("MARKET");
+    const [limitPrice, setLimitPrice] = useState("");
     // ── Data State ────────────────────────────────────────────────────────────
     const [stockData, setStockData] = useState(MOCK_STOCK);
     const [financials, setFinancials] = useState(null);
@@ -238,6 +239,16 @@ export function StockPage() {
     const handleOrder = async () => {
         try {
             setOrderLoading(true);
+
+            const priceToSend = priceType === "MARKET"
+                ? stockData.price
+                : parseFloat(limitPrice);
+
+            if (priceType === "LIMIT" && (!limitPrice || priceToSend <= 0)) {
+                alert("Please enter a valid limit price");
+                return;
+            }
+
             const endpoint = orderSide === "BUY"
                 ? `${API}/stock/${stockData.symbol}/buy`
                 : `${API}/stock/${stockData.symbol}/sell`;
@@ -246,7 +257,7 @@ export function StockPage() {
                 endpoint,
                 {
                     quantity: Number(qty),
-                    price: stockData.price,
+                    price: priceToSend,
                     name: stockData.name,
                 },
                 {
@@ -256,12 +267,10 @@ export function StockPage() {
                 }
             );
 
-            // Redirect to /stocks and tell StockDashboard to open the orders tab
             navigate("/stocks", { state: { tab: "orders" } });
 
         } catch (err) {
             console.error("Order failed:", err.response?.data || err.message);
-            // Optionally show a toast/error here
         } finally {
             setOrderLoading(false);
         }
@@ -369,7 +378,7 @@ export function StockPage() {
     const periodChange = stockData.changes?.[selectedPeriod] || { change: 0, percent: 0 };
     const isPositive = periodChange.change >= 0;
     const themeColor = isPositive ? "#10b981" : "#ef4444";
-    const orderValue = parseFloat(qty || "0") * stockData.price;
+    const orderValue = parseFloat(qty || "0") * (priceType === "MARKET" ? stockData.price : parseFloat(limitPrice) || 0);
 
     // ── Custom Tooltip ────────────────────────────────────────────────────────
     const CustomTooltip = ({ active, payload }) => {
@@ -840,6 +849,7 @@ export function StockPage() {
 
                             {/* Order Card */}
                             <div className="bg-[#111723] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+
                                 {/* Buy / Sell Tabs */}
                                 <div className="flex">
                                     <button
@@ -863,46 +873,64 @@ export function StockPage() {
                                 </div>
 
                                 <div className="p-5 space-y-5">
+
                                     {/* Inputs */}
                                     <div className="space-y-4 text-sm">
+
+                                        {/* Qty */}
                                         <div className="flex justify-between items-center">
                                             <label className="text-gray-400">Qty (NSE)</label>
                                             <input
-                                                type="number"
-                                                min="1"
+                                                type="text"
                                                 value={qty}
+                                                onKeyDown={(e) => {
+                                                    if (!/[0-9]/.test(e.key) && !["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)) {
+                                                        e.preventDefault();
+                                                    }
+                                                }}
                                                 onChange={(e) => setQty(e.target.value)}
                                                 className="w-24 bg-[#1a2130] border border-white/10 rounded py-1.5 px-3 text-right text-white focus:outline-none focus:border-emerald-500/50"
                                             />
                                         </div>
+
+                                        {/* Price Row */}
                                         <div className="flex justify-between items-center">
-                                            <label className="text-gray-400">Price</label>
+                                            <div className="flex items-center gap-2">
+                                                <label className="text-gray-400">Price</label>
+                                                <button
+                                                    onClick={() => {
+                                                        setPriceType(prev => prev === "MARKET" ? "LIMIT" : "MARKET");
+                                                        setLimitPrice("");
+                                                    }}
+                                                    className="text-xs font-bold text-white hover:text-emerald-400 transition-colors"
+                                                >
+                                                    {priceType === "MARKET" ? "Market ▾" : "Limit ▾"}
+                                                </button>
+                                            </div>
+
                                             <input
                                                 type="text"
-                                                value="Market Price"
-                                                disabled
-                                                className="w-24 bg-[#1a2130] border border-white/10 rounded py-1.5 px-3 text-right text-gray-500 cursor-not-allowed"
+                                                onKeyDown={(e) => {
+                                                    if (!/[0-9]/.test(e.key) && !["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)) {
+                                                        e.preventDefault();
+                                                    }
+                                                }}
+                                                value={priceType === "MARKET" ? stockData.price : limitPrice}
+                                                onClick={() => {
+                                                    if (priceType === "MARKET") {
+                                                        setPriceType("LIMIT");
+                                                        setLimitPrice("");
+                                                    }
+                                                }}
+                                                onChange={(e) => priceType === "LIMIT" && setLimitPrice(e.target.value)}
+                                                readOnly={priceType === "MARKET"}
+                                                placeholder={Number(stockData.price).toFixed(2)}
+                                                className={`w-24 bg-[#1a2130] border border-white/10 rounded py-1.5 px-3 text-right text-sm focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600 ${priceType === "MARKET"
+                                                    ? "text-gray-400 cursor-not-allowed"
+                                                    : "text-white cursor-text"
+                                                    }`}
                                             />
                                         </div>
-                                    </div>
-
-                                    {/* Summary */}
-                                    <div className="pt-4 border-t border-white/10 text-sm space-y-2">
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-400">Margin Required</span>
-                                            <span className="font-semibold">
-                                                ${orderValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-gray-500">Available Balance</span>
-                                            <span className="text-gray-400">$45,230.50</span>
-                                        </div>
-                                        {orderValue > 45230.5 && (
-                                            <div className="text-xs text-red-400 bg-red-500/10 rounded px-2 py-1">
-                                                ⚠ Insufficient balance for this order
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Submit */}
@@ -916,6 +944,7 @@ export function StockPage() {
                                     >
                                         {orderLoading ? "Placing..." : `${orderSide} ${stockData.symbol}`}
                                     </button>
+
                                 </div>
                             </div>
 
@@ -927,7 +956,6 @@ export function StockPage() {
                                         const changeObj = stockData.changes?.[period] || { change: 0, percent: 0 };
                                         const isPos = changeObj.percent >= 0;
                                         const labelMap = { "1D": "Today", "1W": "1 Week", "1M": "1 Month", "1Y": "1 Year", "3Y": "3 Years" };
-
                                         return (
                                             <div key={period} className="flex justify-between items-center">
                                                 <span className="text-gray-500">{labelMap[period]}</span>
@@ -939,11 +967,13 @@ export function StockPage() {
                                     })}
                                 </div>
                             </div>
+
                         </div>
                     </div>
+
                 </div>
             </div>
-        </div >
+        </div>
     );
 }
 
