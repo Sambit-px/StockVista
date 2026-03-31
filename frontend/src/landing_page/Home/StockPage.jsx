@@ -906,7 +906,7 @@ export function StockPage() {
                                                         e.preventDefault();
                                                     }
                                                 }}
-                                                value={priceType === "MARKET" ? stockData.price : limitPrice}
+                                                value={priceType === "MARKET" ? stockData?.price ?? "" : limitPrice}
                                                 onClick={() => {
                                                     if (priceType === "MARKET") {
                                                         setPriceType("LIMIT");
@@ -915,7 +915,7 @@ export function StockPage() {
                                                 }}
                                                 onChange={(e) => priceType === "LIMIT" && setLimitPrice(e.target.value)}
                                                 readOnly={priceType === "MARKET"}
-                                                placeholder={Number(stockData.price).toFixed(2)}
+                                                placeholder={stockData?.price ? Number(stockData.price).toFixed(2) : "0.00"}
                                                 className={`w-24 bg-[#1a2130] border border-white/10 rounded py-1.5 px-3 text-right text-sm focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600 ${priceType === "MARKET"
                                                     ? "text-gray-400 cursor-not-allowed"
                                                     : "text-white cursor-text"
