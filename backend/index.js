@@ -301,7 +301,10 @@ app.get("/stock-financials/:symbol", async (req, res) => {
 app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
   try {
     const { symbol } = req.params;
-    const { quantity, price, name } = req.body;
+    const { name } = req.body;
+
+    const quantity = Number(req.body.quantity);
+    const price = Number(req.body.price);
 
     if (!quantity || !price || quantity <= 0) {
       return res.status(400).json({ error: "Invalid quantity or price" });
@@ -311,11 +314,7 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     if (!user.stocks) {
-      user.stocks = {
-        holdings: [],
-        watchlist: [],
-        orders: []
-      };
+      user.stocks = { holdings: [], watchlist: [], orders: [] };
     }
 
     const quote = await getStockQuote(symbol);
@@ -323,11 +322,7 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
 
     const executed = price >= currentPrice;
 
-    console.log("BUY DEBUG:", {
-      price,
-      currentPrice,
-      executed
-    });
+    console.log("BUY DEBUG:", { price, currentPrice, executed });
 
     if (executed) {
       const existingStock = user.stocks.holdings.find(
@@ -380,7 +375,9 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
 app.post("/stock/:symbol/sell", authMiddleware, async (req, res) => {
   try {
     const { symbol } = req.params;
-    const { quantity, price } = req.body;
+
+    const quantity = Number(req.body.quantity);
+    const price = Number(req.body.price);
 
     if (!quantity || !price || quantity <= 0) {
       return res.status(400).json({ error: "Invalid quantity or price" });
@@ -389,18 +386,22 @@ app.post("/stock/:symbol/sell", authMiddleware, async (req, res) => {
     const user = await UserModel.findById(req.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    if (!user.stocks) {
+      user.stocks = { holdings: [], watchlist: [], orders: [] };
+    }
+
     const stock = user.stocks.holdings.find(s => s.symbol === symbol);
 
     if (!stock) {
       return res.status(400).json({ error: "Stock not in holdings" });
     }
 
-    // Get current stock price (implement getStockQuote)
-    const currentPrice = await getStockQuote(symbol);
-    const executed = price <= currentPrice; // true → execute immediately
+    const quote = await getStockQuote(symbol);
+    const currentPrice = quote?.price || 0;
+
+    const executed = price <= currentPrice;
 
     if (executed) {
-      // Reduce holdings
       if (stock.quantity < quantity) {
         return res.status(400).json({ error: "Not enough shares to sell" });
       }
@@ -414,7 +415,6 @@ app.post("/stock/:symbol/sell", authMiddleware, async (req, res) => {
       }
     }
 
-    // Add to orders
     user.stocks.orders.push({
       symbol,
       type: "SELL",
