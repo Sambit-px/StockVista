@@ -310,12 +310,18 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
     const user = await UserModel.findById(req.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Get current stock price (assuming you have a function to fetch latest price)
-    const currentPrice = await getStockQuote(symbol); // implement this
-    const executed = price >= currentPrice; // true → execute immediately
+    const quote = await getStockQuote(symbol);
+    const currentPrice = quote?.price || 0;
+
+    const executed = price >= currentPrice;
+
+    console.log("BUY DEBUG:", {
+      price,
+      currentPrice,
+      executed
+    });
 
     if (executed) {
-      // Execute immediately → update holdings
       const existingStock = user.stocks.holdings.find(
         stock => stock.symbol === symbol
       );
@@ -338,7 +344,6 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
       }
     }
 
-    // Add to orders in both cases
     user.stocks.orders.push({
       symbol,
       type: "BUY",

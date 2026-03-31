@@ -70,7 +70,6 @@ export function StockPage() {
     const [orderSide, setOrderSide] = useState("BUY");
     const [news, setNews] = useState([]);
     const [metrics, setMetrics] = useState([]);
-    const [orderType, setOrderType] = useState("MARKET");
     const [qty, setQty] = useState("1");
 
     const [priceType, setPriceType] = useState("MARKET");
@@ -237,17 +236,17 @@ export function StockPage() {
     };
 
     const handleOrder = async () => {
+        const priceToSend = priceType === "MARKET"
+            ? stockData.price
+            : parseFloat(limitPrice);
+
+        if (priceType === "LIMIT" && (!limitPrice || priceToSend <= 0)) {
+            alert("Please enter a valid limit price");
+            return;
+        }
+
         try {
             setOrderLoading(true);
-
-            const priceToSend = priceType === "MARKET"
-                ? stockData.price
-                : parseFloat(limitPrice);
-
-            if (priceType === "LIMIT" && (!limitPrice || priceToSend <= 0)) {
-                alert("Please enter a valid limit price");
-                return;
-            }
 
             const endpoint = orderSide === "BUY"
                 ? `${API}/stock/${stockData.symbol}/buy`
@@ -255,20 +254,11 @@ export function StockPage() {
 
             await axios.post(
                 endpoint,
-                {
-                    quantity: Number(qty),
-                    price: priceToSend,
-                    name: stockData.name,
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-                    },
-                }
+                { quantity: Number(qty), price: priceToSend, name: stockData.name },
+                { headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` } }
             );
 
             navigate("/stocks", { state: { tab: "orders" } });
-
         } catch (err) {
             console.error("Order failed:", err.response?.data || err.message);
         } finally {
@@ -911,7 +901,7 @@ export function StockPage() {
                                             <input
                                                 type="text"
                                                 onKeyDown={(e) => {
-                                                    if (!/[0-9]/.test(e.key) && !["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)) {
+                                                    if (!/[0-9.]/.test(e.key) && !["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)) {
                                                         e.preventDefault();
                                                     }
                                                 }}
