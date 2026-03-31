@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
+import axios from "axios";
 import {
     ArrowLeft,
     Star,
