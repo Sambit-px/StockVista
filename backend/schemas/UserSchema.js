@@ -5,11 +5,6 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, unique: true },
   password: String,
 
-  balance: {
-    type: Number,
-    default: 50000
-  },
-
   refreshTokens: [String],
 
   stocks: {

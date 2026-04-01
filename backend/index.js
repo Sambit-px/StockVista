@@ -313,9 +313,11 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
     const user = await UserModel.findById(req.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    if (!user.stocks) {
-      user.stocks = { holdings: [], watchlist: [], orders: [] };
-    }
+    if (!user.stocks) user.stocks = {};
+
+    if (!user.stocks.holdings) user.stocks.holdings = [];
+    if (!user.stocks.watchlist) user.stocks.watchlist = [];
+    if (!user.stocks.orders) user.stocks.orders = [];
 
     const quote = await getStockQuote(symbol);
     const currentPrice = quote?.price || 0;
