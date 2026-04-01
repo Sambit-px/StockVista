@@ -317,58 +317,48 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
       user.stocks = { holdings: [], watchlist: [], orders: [] };
     }
 
-    const quote = await getStockQuote(symbol);
-    const currentPrice = quote?.price || 0;
+    // ✅ FIX: don't crash if quote fails — default executed to true for market orders
+    let executed = true;
+    try {
+      const quote = await getStockQuote(symbol);
+      const currentPrice = quote?.price || 0;
+      executed = currentPrice === 0 ? true : price >= currentPrice;
+    } catch (quoteErr) {
+      console.warn("getStockQuote failed, defaulting executed=true:", quoteErr.message);
+    }
 
-    const executed = price >= currentPrice;
-
-    console.log("BUY DEBUG:", { price, currentPrice, executed });
+    console.log("BUY DEBUG:", { price, executed });
 
     if (executed) {
-      const existingStock = user.stocks.holdings.find(
-        stock => stock.symbol === symbol
-      );
-
+      const existingStock = user.stocks.holdings.find(s => s.symbol === symbol);
       if (existingStock) {
         const newQuantity = existingStock.quantity + quantity;
-        const totalCost =
-          existingStock.avgPrice * existingStock.quantity +
-          price * quantity;
-
+        const totalCost = existingStock.avgPrice * existingStock.quantity + price * quantity;
         existingStock.quantity = newQuantity;
         existingStock.avgPrice = totalCost / newQuantity;
       } else {
-        user.stocks.holdings.push({
-          symbol,
-          name,
-          quantity,
-          avgPrice: price
-        });
+        user.stocks.holdings.push({ symbol, name, quantity, avgPrice: price });
       }
     }
 
     user.stocks.orders.push({
-      symbol,
-      type: "BUY",
-      quantity,
-      price,
+      symbol, type: "BUY", quantity, price,
       status: executed ? "EXECUTED" : "PENDING",
       placedAt: new Date()
     });
 
+    user.markModified("stocks"); // ✅ FIX: ensure Mongoose detects nested changes
     await user.save();
 
     res.json({
-      message: executed
-        ? "Stock bought successfully"
-        : "Order placed in pending orders",
+      message: executed ? "Stock bought successfully" : "Order placed in pending orders",
       holdings: user.stocks.holdings,
       orders: user.stocks.orders
     });
 
   } catch (error) {
-    console.error("Buy error:", error);
-    res.status(500).json({ error: "Buy failed" });
+    console.error("Buy error:", error); // ✅ will now show the real cause
+    res.status(500).json({ error: "Buy failed", detail: error.message });
   }
 });
 
