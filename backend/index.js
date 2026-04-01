@@ -435,6 +435,11 @@ app.post("/stock/:symbol/sell", authMiddleware, async (req, res) => {
   }
 });
 
+app.get("/debug-schema", (req, res) => {
+  const paths = Object.keys(UserModel.schema.paths).filter(p => p.includes("stocks"));
+  res.json(paths);
+});
+
 app.listen(PORT, () => {
   console.log("App started!");
   mongoose.connect(uri);
