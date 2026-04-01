@@ -5,7 +5,7 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 
-const UserModel = require("./schemas/UserSchema");
+const UserModel = require("./model/UserModel.js");
 const authMiddleware = require("./middleware/auth.js");
 const authRoutes = require("./routes/auth");
 
