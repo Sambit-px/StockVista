@@ -321,8 +321,7 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
 
     const quote = await getStockQuote(symbol);
     const currentPrice = quote?.price || 0;
-
-    const executed = price >= currentPrice;
+    const executed = price <= currentPrice;
 
     console.log("BUY DEBUG:", { price, currentPrice, executed });
 
