@@ -42,5 +42,5 @@ const UserSchema = new mongoose.Schema({
     ]
   }
 });
-
+console.log("SCHEMA LOADED, orders type:", UserSchema.path("stocks.orders"));
 module.exports = mongoose.model("User", UserSchema);

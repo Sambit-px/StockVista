@@ -5,7 +5,8 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 
-const UserModel = require("./schemas/UserSchema");
+const UserModel = require("./model/UserModel");
+console.log("USERMODEL PATHS:", Object.keys(UserModel.schema.paths).filter(p => p.includes("stocks")));
 const authMiddleware = require("./middleware/auth.js");
 const authRoutes = require("./routes/auth");
 
