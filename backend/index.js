@@ -301,10 +301,10 @@ app.get("/stock-financials/:symbol", async (req, res) => {
 app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
   try {
     const { symbol } = req.params;
-    const { name } = req.body;
+    const { name, quantity: q, price: p } = req.body;
 
-    const quantity = Number(req.body.quantity);
-    const price = Number(req.body.price);
+    const quantity = Number(q);
+    const price = Number(p);
 
     if (!quantity || !price || quantity <= 0) {
       return res.status(400).json({ error: "Invalid quantity or price" });
@@ -313,41 +313,42 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
     const user = await UserModel.findById(req.userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    if (!user.stocks) user.stocks = {};
+    // Safely initialize stocks
+    user.stocks = user.stocks || {};
+    user.stocks.holdings = user.stocks.holdings || [];
+    user.stocks.orders = user.stocks.orders || [];
+    user.stocks.watchlist = user.stocks.watchlist || [];
 
-    if (!user.stocks.holdings) user.stocks.holdings = [];
-    if (!user.stocks.watchlist) user.stocks.watchlist = [];
-    if (!user.stocks.orders) user.stocks.orders = [];
-
+    // Fetch current price
     const quote = await getStockQuote(symbol);
-    const currentPrice = quote?.price || 0;
-    const executed = price <= currentPrice;
 
-    console.log("BUY DEBUG:", { price, currentPrice, executed });
+    if (!quote || !quote.price) {
+      return res.status(400).json({ error: "Failed to fetch current stock price" });
+    }
 
+    const currentPrice = Number(quote.price);
+    const executed = price >= currentPrice;
+
+    // Update holdings only if executed
     if (executed) {
-      const existingStock = user.stocks.holdings.find(
-        stock => stock.symbol === symbol
-      );
+      let existing = user.stocks.holdings.find(s => s.symbol === symbol);
 
-      if (existingStock) {
-        const newQuantity = existingStock.quantity + quantity;
-        const totalCost =
-          existingStock.avgPrice * existingStock.quantity +
-          price * quantity;
-
-        existingStock.quantity = newQuantity;
-        existingStock.avgPrice = totalCost / newQuantity;
+      if (existing) {
+        const newQty = existing.quantity + quantity;
+        existing.avgPrice =
+          (existing.avgPrice * existing.quantity + price * quantity) / newQty;
+        existing.quantity = newQty;
       } else {
         user.stocks.holdings.push({
           symbol,
-          name,
+          name: name || symbol,
           quantity,
           avgPrice: price
         });
       }
     }
 
+    // Add order
     user.stocks.orders.push({
       symbol,
       type: "BUY",
