@@ -350,6 +350,8 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
     user.markModified("stocks"); // ✅ FIX: ensure Mongoose detects nested changes
     await user.save();
 
+    console.log("stocks type:", typeof user.stocks.orders, Array.isArray(user.stocks.orders));
+
     res.json({
       message: executed ? "Stock bought successfully" : "Order placed in pending orders",
       holdings: user.stocks.holdings,
