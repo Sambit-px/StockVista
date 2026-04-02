@@ -5,7 +5,9 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 
-const UserModel = require("./model/UserModel.js");
+const HoldingModel = require("./model/HoldingModel.js");
+const OrderModel = require("./model/OrderModel.js");
+const WatchlistModel = require("./model/WatchlistModel.js");
 const authMiddleware = require("./middleware/auth.js");
 const authRoutes = require("./routes/auth");
 
@@ -301,45 +303,31 @@ app.get("/stock-financials/:symbol", async (req, res) => {
 app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
   try {
     const { symbol } = req.params;
-    const { name, quantity: q, price: p } = req.body;
-
-    const quantity = Number(q);
-    const price = Number(p);
+    const { name } = req.body;
+    const quantity = Number(req.body.quantity);
+    const price = Number(req.body.price);
 
     if (!quantity || !price || quantity <= 0) {
       return res.status(400).json({ error: "Invalid quantity or price" });
     }
 
-    const user = await UserModel.findById(req.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    // Safely initialize stocks
-    user.stocks = user.stocks || {};
-    user.stocks.holdings = user.stocks.holdings || [];
-    user.stocks.orders = user.stocks.orders || [];
-    user.stocks.watchlist = user.stocks.watchlist || [];
-
-    // Fetch current price
     const quote = await getStockQuote(symbol);
-
-    if (!quote || !quote.price) {
-      return res.status(400).json({ error: "Failed to fetch current stock price" });
-    }
+    if (!quote?.price) return res.status(400).json({ error: "Failed to fetch current stock price" });
 
     const currentPrice = Number(quote.price);
     const executed = price >= currentPrice;
 
-    // Update holdings only if executed
     if (executed) {
-      let existing = user.stocks.holdings.find(s => s.symbol === symbol);
+      const existing = await HoldingModel.findOne({ userId: req.userId, symbol });
 
       if (existing) {
         const newQty = existing.quantity + quantity;
-        existing.avgPrice =
-          (existing.avgPrice * existing.quantity + price * quantity) / newQty;
+        existing.avgPrice = (existing.avgPrice * existing.quantity + price * quantity) / newQty;
         existing.quantity = newQty;
+        await existing.save();
       } else {
-        user.stocks.holdings.push({
+        await HoldingModel.create({
+          userId: req.userId,
           symbol,
           name: name || symbol,
           quantity,
@@ -348,8 +336,8 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
       }
     }
 
-    // Add order
-    user.stocks.orders.push({
+    await OrderModel.create({
+      userId: req.userId,
       symbol,
       type: "BUY",
       quantity,
@@ -358,14 +346,15 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
       placedAt: new Date()
     });
 
-    await user.save();
+    const [holdings, orders] = await Promise.all([
+      HoldingModel.find({ userId: req.userId }),
+      OrderModel.find({ userId: req.userId })
+    ]);
 
     res.json({
-      message: executed
-        ? "Stock bought successfully"
-        : "Order placed in pending orders",
-      holdings: user.stocks.holdings,
-      orders: user.stocks.orders
+      message: executed ? "Stock bought successfully" : "Order placed in pending orders",
+      holdings,
+      orders
     });
 
   } catch (error) {
@@ -374,45 +363,40 @@ app.post("/stock/:symbol/buy", authMiddleware, async (req, res) => {
   }
 });
 
+
 app.post("/stock/:symbol/sell", authMiddleware, async (req, res) => {
   try {
     const { symbol } = req.params;
-    const { quantity, price } = req.body;
+    const quantity = Number(req.body.quantity);
+    const price = Number(req.body.price);
 
     if (!quantity || !price || quantity <= 0) {
       return res.status(400).json({ error: "Invalid quantity or price" });
     }
 
-    const user = await UserModel.findById(req.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    const holding = await HoldingModel.findOne({ userId: req.userId, symbol });
+    if (!holding) return res.status(400).json({ error: "Stock not in holdings" });
 
-    const stock = user.stocks.holdings.find(s => s.symbol === symbol);
-
-    if (!stock) {
-      return res.status(400).json({ error: "Stock not in holdings" });
-    }
-
-    // Get current stock price (implement getStockQuote)
-    const currentPrice = await getStockQuote(symbol);
-    const executed = price <= currentPrice; // true → execute immediately
+    const quote = await getStockQuote(symbol);
+    const currentPrice = Number(quote?.price || 0);
+    const executed = price <= currentPrice;
 
     if (executed) {
-      // Reduce holdings
-      if (stock.quantity < quantity) {
+      if (holding.quantity < quantity) {
         return res.status(400).json({ error: "Not enough shares to sell" });
       }
 
-      stock.quantity -= quantity;
+      holding.quantity -= quantity;
 
-      if (stock.quantity === 0) {
-        user.stocks.holdings = user.stocks.holdings.filter(
-          s => s.symbol !== symbol
-        );
+      if (holding.quantity === 0) {
+        await HoldingModel.deleteOne({ userId: req.userId, symbol });
+      } else {
+        await holding.save();
       }
     }
 
-    // Add to orders
-    user.stocks.orders.push({
+    await OrderModel.create({
+      userId: req.userId,
       symbol,
       type: "SELL",
       quantity,
@@ -421,14 +405,15 @@ app.post("/stock/:symbol/sell", authMiddleware, async (req, res) => {
       placedAt: new Date()
     });
 
-    await user.save();
+    const [holdings, orders] = await Promise.all([
+      HoldingModel.find({ userId: req.userId }),
+      OrderModel.find({ userId: req.userId })
+    ]);
 
     res.json({
-      message: executed
-        ? "Stock sold successfully"
-        : "Sell order placed in pending orders",
-      holdings: user.stocks.holdings,
-      orders: user.stocks.orders
+      message: executed ? "Stock sold successfully" : "Sell order placed in pending orders",
+      holdings,
+      orders
     });
 
   } catch (error) {
