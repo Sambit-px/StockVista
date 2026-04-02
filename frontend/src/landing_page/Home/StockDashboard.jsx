@@ -11,69 +11,12 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { HiListBullet } from "react-icons/hi2";
 import SearchBar from "./SearchBar.jsx";
-
 import {
-    TrendingUp,
-    TrendingDown,
-    Search,
-    Star,
-    Bell,
-    User,
-    ArrowLeft,
-    Plus,
-    ShoppingCart,
-    Filter,
-    BarChart2,
-    Package,
-    RefreshCw,
-    Download,
-    Eye,
-    Compass,
-    Activity,
-    Zap,
-    Flame,
-    ArrowUpRight,
-    ArrowDownRight,
+    TrendingUp, TrendingDown, Bell, User, ArrowLeft,
+    ShoppingCart, Package, Eye, Compass, Flame,
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL;
-const buyStock = async ({ symbol, quantity, price }) => {
-    try {
-        const res = await axios.post(`${API}/orders/buy`, {
-            symbol,
-            quantity,
-            price
-        });
-
-        console.log("Buy success:", res.data);
-
-        // refresh holdings or orders if needed
-        // fetchOrders();
-        // fetchHoldings();
-
-    } catch (err) {
-        console.error("Buy failed:", err.response?.data || err.message);
-    }
-};
-
-const sellStock = async ({ symbol, quantity, price }) => {
-    try {
-        const res = await axios.post(`${API}/orders/sell`, {
-            symbol,
-            quantity,
-            price
-        });
-
-        console.log("Sell success:", res.data);
-
-        // refresh
-        // fetchOrders();
-        // fetchHoldings();
-
-    } catch (err) {
-        console.error("Sell failed:", err.response?.data || err.message);
-    }
-};
 
 export default function StockDashboard() {
     const navigate = useNavigate();
@@ -82,34 +25,36 @@ export default function StockDashboard() {
     const [gainers, setGainers] = useState([]);
     const [losers, setLosers] = useState([]);
     const [activeStocks, setActiveStocks] = useState([]);
-    const [stocks, setStocks] = useState([]);
     const [holdings, setHoldings] = useState([]);
     const [watchlistStocks, setWatchlistStocks] = useState([]);
     const [orders, setOrders] = useState([]);
-    const [refreshing, setRefreshing] = useState(false);
     const [openMenu, setOpenMenu] = useState(null);
     const [hoverRow, setHoverRow] = useState(null);
 
     const items = [
-        { icon: <Compass size={30} strokeWidth={1.2} />, label: 'Explore', onClick: () => setActiveTab("explore"), },
-        { icon: <Package size={30} strokeWidth={1.2} />, label: 'Holdings', onClick: () => setActiveTab("holdings"), },
-        { icon: <Eye size={30} strokeWidth={1.2} />, label: 'Watchlist', onClick: () => setActiveTab("watchlist"), },
-        { icon: <ShoppingCart size={30} strokeWidth={1.2} />, label: 'Orders', onClick: () => setActiveTab("orders"), },
+        { icon: <Compass size={30} strokeWidth={1.2} />, label: 'Explore', onClick: () => setActiveTab("explore") },
+        { icon: <Package size={30} strokeWidth={1.2} />, label: 'Holdings', onClick: () => setActiveTab("holdings") },
+        { icon: <Eye size={30} strokeWidth={1.2} />, label: 'Watchlist', onClick: () => setActiveTab("watchlist") },
+        { icon: <ShoppingCart size={30} strokeWidth={1.2} />, label: 'Orders', onClick: () => setActiveTab("orders") },
     ];
 
+    // ✅ avgPrice and quantity come directly from MongoDB HoldingSchema
+    const totalInvested = holdings.reduce((sum, h) => sum + (h.avgPrice * h.quantity), 0);
 
-    const totalInvested = holdings.reduce((sum, h) => {
-        return sum + (h.avgPrice * h.quantity);
-    }, 0);
+    const fetchAllStocks = async () => {
+        try {
+            const token = localStorage.getItem("accessToken");
+            const res = await axios.get(`${API}/stocks`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setHoldings(res.data.holdings || []);
+            setWatchlistStocks(res.data.watchlist || []);
+            setOrders(res.data.orders || []);
+        } catch (err) {
+            console.error("Failed to fetch stocks:", err.response?.status, err.message);
+        }
+    };
 
-    const totalCurrentValue = holdings.reduce((sum, h) => {
-        const stock = stocks.find(s => s.symbol === h.symbol);
-        if (!stock) return sum;
-        return sum + (stock.price * h.quantity);
-    }, 0);
-
-    const totalPL = totalCurrentValue - totalInvested;
-    const totalPLPercent = (totalPL / totalInvested) * 100;
     const fetchExploreData = async () => {
         try {
             const gainersRes = await axios.get(`${API}/explore/gainers`);
@@ -122,92 +67,50 @@ export default function StockDashboard() {
             console.error("Explore fetch error:", err);
         }
     };
-    //Buy handler
-    const handleBuy = async (stock) => {
-        try {
-            await axios.post(`${API}/stock/${stock.symbol}/buy`, {
-                quantity: 1,         // default 1 share
-                price: stock.price,  // current stock price
-            });
-            console.log("Buy order placed for", stock.symbol);
 
-            // Refresh the stock data after buying
-            fetchAllStocks([stock.symbol]);
+    // ✅ holding.avgPrice already calculated and stored by backend on buy
+    const handleBuy = async (holding) => {
+        try {
+            const token = localStorage.getItem("accessToken");
+            await axios.post(`${API}/stock/${holding.symbol}/buy`,
+                { quantity: 1, price: holding.avgPrice, name: holding.name },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            await fetchAllStocks();
         } catch (err) {
             console.error("Buy order failed:", err.response?.data || err.message);
         }
     };
 
-    //Sell handler
-    const handleSell = async (stock) => {
+    const handleSell = async (holding) => {
         try {
-            await axios.post(`${API}/stock/${stock.symbol}/sell`, {
-                quantity: 1,         // default 1 share
-                price: stock.price,  // current stock price
-            });
-            console.log("Sell order placed for", stock.symbol);
-
-            // Refresh the stock data after selling
-            fetchAllStocks([stock.symbol]);
+            const token = localStorage.getItem("accessToken");
+            await axios.post(`${API}/stock/${holding.symbol}/sell`,
+                { quantity: 1, price: holding.avgPrice },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            await fetchAllStocks();
         } catch (err) {
             console.error("Sell order failed:", err.response?.data || err.message);
         }
     };
 
-
-    // Define a reusable function
-    const fetchAllStocks = async (symbols) => {
-        try {
-            const token = localStorage.getItem("accessToken");
-            const res = await axios.get(`${API}/stocks?symbols=${symbols.join(",")}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            setHoldings(res.data.holdings || []);
-            setWatchlistStocks(res.data.watchlist || []);
-            setOrders(res.data.orders || []);
-
-            console.log("Stocks updated:", res.data);
-        } catch (err) {
-            console.error("Failed to fetch stocks:", err.response?.status, err.message);
-        }
-    };
+    useEffect(() => {
+        fetchAllStocks();
+    }, []);
 
     useEffect(() => {
-        const allSymbols = [...new Set([
-            ...holdings.map(h => h.symbol),
-            ...watchlistStocks.map(w => w.symbol)
-        ])];
-
-        if (allSymbols.length === 0) return;
-
-        // Initial fetch
-        fetchAllStocks(allSymbols);
-
-        // Interval fetch every 3 minutes
-        const interval = setInterval(() => fetchAllStocks(allSymbols), 180000);
-
-        return () => clearInterval(interval);
-    }, [holdings, watchlistStocks]);
-
-    useEffect(() => {
-        fetchExploreData(); // FMP gainers/losers/active
-
-        const exploreInterval = setInterval(fetchExploreData, 300000); // 5 min
-
+        fetchExploreData();
+        const exploreInterval = setInterval(fetchExploreData, 300000);
         return () => clearInterval(exploreInterval);
     }, []);
 
     useEffect(() => {
-        if (location.state?.tab) {
-            setActiveTab(location.state.tab);
-        }
+        if (location.state?.tab) setActiveTab(location.state.tab);
     }, [location.state]);
-
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700">
-
             <div className="relative">
                 {/* Header */}
                 <div>
@@ -220,37 +123,24 @@ export default function StockDashboard() {
                                 <ArrowLeft className="h-5 w-5" />
                             </button>
                             <div className="flex items-center gap-3">
-                                {/* Search & Filters */}
-                                <div className="rounded-2xl shadow-xl pt-4 px-5 mb-6 ">
+                                <div className="rounded-2xl shadow-xl pt-4 px-5 mb-6">
                                     <div className="flex flex-col md:flex-row gap-4">
                                         <div className="flex-1 relative">
-                                            <SearchBar
-                                                onSelect={(symbol) => {
-                                                    // Navigate to stock page on selection
-                                                    navigate(`/stock/${symbol}`);
-                                                }}
-                                            />
+                                            <SearchBar onSelect={(symbol) => navigate(`/stock/${symbol}`)} />
                                         </div>
                                     </div>
                                 </div>
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    className="p-3 hover:bg-slate-700/50 backdrop-blur-sm rounded-3xl transition-colors text-slate-300"
-                                >
+                                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                                    className="p-3 hover:bg-slate-700/50 backdrop-blur-sm rounded-3xl transition-colors text-slate-300">
                                     <Bell className="h-5 w-5" />
                                 </motion.button>
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    className="p-3 hover:bg-slate-700/50 backdrop-blur-sm rounded-3xl transition-colors text-slate-300"
-                                >
+                                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                                    className="p-3 hover:bg-slate-700/50 backdrop-blur-sm rounded-3xl transition-colors text-slate-300">
                                     <User className="h-5 w-5" />
                                 </motion.button>
                             </div>
                         </div>
                         <div className="flex justify-center">
-
                             <PillNav
                                 items={[
                                     { label: 'Stocks', href: '/stocks' },
@@ -268,39 +158,22 @@ export default function StockDashboard() {
                                 initialLoadAnimation={false}
                             />
                         </div>
-
-
-
                     </div>
                 </div>
 
                 <div className="max-w-7xl mx-auto px-6 py-8">
-
-
-                    {/* Dock-style Tabs */}
-                    <div className=" relative flex justify-center mb-8">
+                    <div className="relative flex justify-center mb-8">
                         <div className="h-[90px] flex items-center">
-                            <Dock
-                                items={items}
-                                panelHeight={70}
-                                baseItemSize={60}
-                                magnification={80}
-                            />
+                            <Dock items={items} panelHeight={70} baseItemSize={60} magnification={80} />
                         </div>
                     </div>
 
                     <AnimatePresence mode="wait">
+
                         {/* Explore Tab */}
                         {activeTab === "explore" && (
-                            <motion.div
-                                key="explore"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.3 }}
-                                className="space-y-6"
-                            >
-                                {/* Trending Stocks */}
+                            <motion.div key="explore" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-6">
                                 <div>
                                     <div className="flex items-center gap-2 mb-4">
                                         <Flame className="h-5 w-5 text-[#fee685]" />
@@ -308,39 +181,25 @@ export default function StockDashboard() {
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {activeStocks.map((stock, index) => (
-                                            <motion.div
-                                                key={stock.symbol}
-                                                onClick={() => navigate(`/stock/${stock.symbol}`)}
-                                                initial={{ opacity: 0, x: -20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: index * 0.05, ease: "easeInOut" }}
-                                                whileHover={{ scale: 1.02 }}
-                                                className="bg-slate-800/90 border-2 border-slate-700/50 rounded-2xl p-5 cursor-pointer hover:border-amber-200 duration-100"
-                                            >
+                                            <motion.div key={stock.symbol} onClick={() => navigate(`/stock/${stock.symbol}`)}
+                                                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: index * 0.05, ease: "easeInOut" }} whileHover={{ scale: 1.02 }}
+                                                className="bg-slate-800/90 border-2 border-slate-700/50 rounded-2xl p-5 cursor-pointer hover:border-amber-200 duration-100">
                                                 <div className="flex items-center justify-between mb-3">
-                                                    <div>
-                                                        <h4 className="text-white">{stock.name}</h4>
-                                                    </div>
-
-
+                                                    <h4 className="text-white">{stock.name}</h4>
                                                     <div className="flex flex-col items-end">
                                                         <div className="text-lg font-semibold text-white">${stock.price.toFixed(2)}</div>
-                                                        <div className="text-sm font-semibold text-green-400">{stock.change >= 0 ? "+" : ""}
-                                                            {stock.change.toFixed(2)} ({stock.changesPercentage.toFixed(2)}%)
+                                                        <div className="text-sm font-semibold text-green-400">
+                                                            {stock.change >= 0 ? "+" : ""}{stock.change.toFixed(2)} ({stock.changesPercentage.toFixed(2)}%)
                                                         </div>
                                                     </div>
-
-
                                                 </div>
-
                                             </motion.div>
                                         ))}
                                     </div>
                                 </div>
 
-                                {/* Top Gainers & Losers */}
                                 <div className="grid md:grid-cols-2 gap-6">
-                                    {/* Top Gainers */}
                                     <div>
                                         <div className="flex items-center gap-2 mb-4">
                                             <TrendingUp className="h-5 w-5 text-green-400" />
@@ -348,29 +207,16 @@ export default function StockDashboard() {
                                         </div>
                                         <div className="space-y-3">
                                             {gainers.map((stock, index) => (
-                                                <motion.div
-                                                    key={stock.symbol}
-                                                    onClick={() => navigate(`/stock/${stock.symbol}`)}
-                                                    initial={{ opacity: 0, x: -20 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    transition={{ delay: index * 0.05, ease: "easeInOut" }}
-                                                    whileHover={{ scale: 1.02 }}
-                                                    className="bg-slate-800/90 border-2 border-slate-700/50 rounded-2xl p-4 cursor-pointer hover:border-green-400 duration-100"
-                                                >
+                                                <motion.div key={stock.symbol} onClick={() => navigate(`/stock/${stock.symbol}`)}
+                                                    initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: index * 0.05, ease: "easeInOut" }} whileHover={{ scale: 1.02 }}
+                                                    className="bg-slate-800/90 border-2 border-slate-700/50 rounded-2xl p-4 cursor-pointer hover:border-green-400 duration-100">
                                                     <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <h4 className="font-semibold text-white">{stock.name}</h4>
-
-                                                        </div>
+                                                        <h4 className="font-semibold text-white">{stock.name}</h4>
                                                         <div className="text-right">
                                                             <div className="font-semibold text-white">${stock.price}</div>
-
-                                                            <div
-                                                                className={`text-sm font-semibold ${stock.change >= 0 ? "text-green-400" : "text-red-400"
-                                                                    }`}
-                                                            >
-                                                                {stock.change >= 0 ? "+" : ""}
-                                                                {stock.change.toFixed(2)} ({stock.changesPercentage.toFixed(2)}%)
+                                                            <div className={`text-sm font-semibold ${stock.change >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                                                {stock.change >= 0 ? "+" : ""}{stock.change.toFixed(2)} ({stock.changesPercentage.toFixed(2)}%)
                                                             </div>
                                                         </div>
                                                     </div>
@@ -379,24 +225,17 @@ export default function StockDashboard() {
                                         </div>
                                     </div>
 
-                                    {/* Top Losers */}
                                     <div>
                                         <div className="flex items-center gap-2 mb-4">
                                             <TrendingDown className="h-5 w-5 text-red-400" />
                                             <h3 className="text-xl font-bold text-white">Top Losers</h3>
                                         </div>
-
                                         <div className="space-y-3">
                                             {losers.map((stock, index) => (
-                                                <motion.div
-                                                    key={stock.symbol}
-                                                    onClick={() => navigate(`/stock/${stock.symbol}`)}
-                                                    initial={{ opacity: 0, x: -20 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    transition={{ delay: index * 0.05, ease: "easeInOut" }}
-                                                    whileHover={{ scale: 1.02 }}
-                                                    className="bg-slate-800/90 border-2 border-slate-700/50 rounded-2xl p-4 cursor-pointer hover:border-red-400 duration-100"
-                                                >
+                                                <motion.div key={stock.symbol} onClick={() => navigate(`/stock/${stock.symbol}`)}
+                                                    initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: index * 0.05, ease: "easeInOut" }} whileHover={{ scale: 1.02 }}
+                                                    className="bg-slate-800/90 border-2 border-slate-700/50 rounded-2xl p-4 cursor-pointer hover:border-red-400 duration-100">
                                                     <div className="flex items-center justify-between">
                                                         <div>
                                                             <h4 className="font-semibold text-white">{stock.symbol}</h4>
@@ -404,13 +243,8 @@ export default function StockDashboard() {
                                                         </div>
                                                         <div className="text-right">
                                                             <div className="font-semibold text-white">${stock.price}</div>
-
-                                                            <div
-                                                                className={`text-sm font-semibold ${stock.change >= 0 ? "text-green-400" : "text-red-400"
-                                                                    }`}
-                                                            >
-                                                                {stock.change >= 0 ? "+" : ""}
-                                                                {stock.change.toFixed(2)} ({stock.changesPercentage.toFixed(2)}%)
+                                                            <div className={`text-sm font-semibold ${stock.change >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                                                {stock.change >= 0 ? "+" : ""}{stock.change.toFixed(2)} ({stock.changesPercentage.toFixed(2)}%)
                                                             </div>
                                                         </div>
                                                     </div>
@@ -424,361 +258,186 @@ export default function StockDashboard() {
 
                         {/* Holdings Tab */}
                         {activeTab === "holdings" && (
-                            <motion.div
-                                key="holdings"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.3 }}
-                                className="space-y-6"
-                            >
+                            <motion.div key="holdings" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-6">
 
-                                {/* Portfolio Summary */}
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                {/* ✅ Only MongoDB-computable summary cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="rounded-2xl p-5 shadow-lg hover:bg-slate-800/60">
                                         <div className="text-sm text-slate-400">Total Invested</div>
                                         <div className="text-2xl font-bold text-white">
                                             ${totalInvested.toLocaleString()}
                                         </div>
                                     </div>
-
                                     <div className="rounded-2xl p-5 shadow-lg hover:bg-slate-800/60">
-                                        <div className="text-sm text-slate-400">Current Value</div>
-                                        <div className="text-2xl font-bold text-white">
-                                            ${totalCurrentValue.toLocaleString()}
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-2xl p-5 shadow-lg hover:bg-slate-800/60">
-                                        <div className="text-sm text-slate-400">Total P&L</div>
-                                        <div
-                                            className={`text-2xl font-bold ${totalPL >= 0 ? "text-green-400" : "text-red-400"
-                                                }`}
-                                        >
-                                            {totalPL >= 0 ? "+" : ""}${totalPL.toFixed(2)}
-                                        </div>
-                                        <div
-                                            className={`text-sm ${totalPL >= 0 ? "text-green-400" : "text-red-400"
-                                                }`}
-                                        >
-                                            ({totalPLPercent.toFixed(2)}%)
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-2xl p-5 shadow-lg hover:bg-slate-800/60">
-                                        <div className="text-sm text-slate-400">Total P&L</div>
-                                        <div
-                                            className={`text-2xl font-bold ${totalPL >= 0 ? "text-green-400" : "text-red-400"
-                                                }`}
-                                        >
-                                            {totalPL >= 0 ? "+" : ""}${totalPL.toFixed(2)}
-                                        </div>
-                                        <div
-                                            className={`text-sm ${totalPL >= 0 ? "text-green-400" : "text-red-400"
-                                                }`}
-                                        >
-                                            ({totalPLPercent.toFixed(2)}%)
-                                        </div>
+                                        <div className="text-sm text-slate-400">Total Holdings</div>
+                                        <div className="text-2xl font-bold text-white">{holdings.length}</div>
                                     </div>
                                 </div>
 
                                 {/* Holdings Table */}
-                                <motion.div
-                                    whileHover={{ scale: 1.005 }}
-                                    className="bg-slate-800/90 border-2 border-slate-700/50 rounded-2xl p-6"
-                                >
+                                <motion.div whileHover={{ scale: 1.005 }}
+                                    className="bg-slate-800/90 border-2 border-slate-700/50 rounded-2xl p-6">
                                     <table className="w-full text-sm">
-
                                         <thead className="text-slate-400 border-b border-slate-700">
                                             <tr>
                                                 <th className="text-left pb-3">Instrument</th>
-                                                <th className="text-left pb-3">Day Change</th>
-                                                <th className="text-left pb-3">Returns</th>
-                                                <th className="text-left pb-3">Current (Invested)</th>
+                                                <th className="text-left pb-3">Quantity</th>
+                                                <th className="text-left pb-3">Avg Price</th>
+                                                {/* ✅ avgPrice stored by backend in HoldingSchema */}
+                                                <th className="text-left pb-3">Invested</th>
+                                                <th className="text-left pb-3">Actions</th>
                                             </tr>
                                         </thead>
-
                                         <tbody>
                                             {holdings.map((holding, index) => {
-
-                                                const stock = stocks.find(s => s.symbol === holding.symbol);
-
-                                                if (!stock) return null;
-
-                                                const price = stock.price;
-                                                const dayChange = stock.change;
-
-                                                const curValue = price * holding.quantity;
+                                                // ✅ All from MongoDB — no live price needed
                                                 const invested = holding.avgPrice * holding.quantity;
-
-                                                const pnl = curValue - invested;
-                                                const pnlPercent = (pnl / invested) * 100;
-
-                                                const dayPercent = (dayChange / price) * 100;
-                                                const isProfit = pnl >= 0;
-                                                const dayPositive = dayChange >= 0;
 
                                                 return (
                                                     <motion.tr
-                                                        key={holding.symbol}
-                                                        initial={{ opacity: 0, x: -20 }}
-                                                        animate={{ opacity: 1, x: 0 }}
+                                                        key={holding._id}
+                                                        initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
                                                         transition={{ delay: index * 0.05, ease: "easeInOut" }}
                                                         className="border-b border-slate-700/40"
-                                                        onMouseEnter={() => {
-                                                            setHoverRow(holding.symbol);
-                                                        }
-                                                        }
-                                                        onMouseLeave={() => {
-                                                            setHoverRow(null);
-                                                        }
-                                                        }
+                                                        onMouseEnter={() => setHoverRow(holding._id)}
+                                                        onMouseLeave={() => setHoverRow(null)}
                                                     >
-
                                                         {/* Instrument */}
                                                         <td className="px-4 py-3 cursor-pointer hover:text-blue-500"
                                                             onClick={() => navigate(`/stock/${holding.symbol}`)}>
                                                             <div className="font-semibold text-white">{holding.symbol}</div>
-                                                            <div className="text-xs text-slate-400">{holding.quantity} shares • Avg ${holding.avgPrice}</div>
-                                                        </td>
-                                                        {/* Day Change */}
-                                                        <td>
-                                                            <div className={dayPositive ? "text-green-400" : "text-red-400"}>
-                                                                ${dayChange.toFixed(2)}
-                                                            </div>
-                                                            <div className="text-xs text-slate-400">
-                                                                ({dayPercent.toFixed(2)}%)
-                                                            </div>
+                                                            <div className="text-xs text-slate-400">{holding.name}</div>
                                                         </td>
 
-                                                        {/* Returns */}
-                                                        <td>
-                                                            <div className={isProfit ? "text-green-400" : "text-red-400"}>
-                                                                ${pnl.toFixed(2)}
-                                                            </div>
-                                                            <div className="text-xs text-slate-400">
-                                                                ({pnlPercent.toFixed(2)}%)
-                                                            </div>
+                                                        {/* Quantity — HoldingSchema: quantity */}
+                                                        <td className="px-4 py-3 text-white">{holding.quantity}</td>
+
+                                                        {/* Avg Price — HoldingSchema: avgPrice (calculated by backend on buy) */}
+                                                        <td className="px-4 py-3 text-white">${holding.avgPrice.toFixed(2)}</td>
+
+                                                        {/* Invested */}
+                                                        <td className="px-4 py-3 text-white">${invested.toLocaleString()}</td>
+
+                                                        {/* Actions */}
+                                                        <td className="px-4 py-3">
+                                                            <Menu as="div" className="relative inline-block"
+                                                                onMouseEnter={() => setOpenMenu(holding._id)}
+                                                                onMouseLeave={() => setOpenMenu(null)}>
+                                                                <MenuButton className={`rounded-lg p-1 transition-opacity duration-200 ${hoverRow === holding._id ? "opacity-100" : "opacity-0"} hover:bg-gray-100`}>
+                                                                    <MoreVert className="h-4 w-4 text-gray-700" />
+                                                                </MenuButton>
+                                                                <Transition as={Fragment} show={openMenu === holding._id}
+                                                                    enter="transition ease-out duration-200"
+                                                                    enterFrom="opacity-0 translate-y-2 scale-95"
+                                                                    enterTo="opacity-100 translate-y-0 scale-100"
+                                                                    leave="transition ease-in duration-150"
+                                                                    leaveFrom="opacity-100 translate-y-0 scale-100"
+                                                                    leaveTo="opacity-0 translate-y-2 scale-95">
+                                                                    <MenuItems anchor="bottom end"
+                                                                        className="absolute right-0 mt-2 w-48 z-[9999] bg-slate-900/80 backdrop-blur-xl text-slate-300 border-2 border-slate-700 rounded-md shadow-lg origin-top-right">
+                                                                        <MenuItem>
+                                                                            <motion.button
+                                                                                whileHover={{ scale: 1.02, fontWeight: 700 }}
+                                                                                whileTap={{ scale: 0.95 }}
+                                                                                transition={{ type: "tween", ease: "easeInOut", duration: 0.2 }}
+                                                                                className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/50 rounded"
+                                                                                onClick={() => handleBuy(holding)}>
+                                                                                <HiListBullet className="stroke-[1.4]" /> Buy More
+                                                                            </motion.button>
+                                                                        </MenuItem>
+                                                                        <MenuItem>
+                                                                            <motion.button
+                                                                                whileHover={{ scale: 1.02, fontWeight: 700 }}
+                                                                                whileTap={{ scale: 0.95 }}
+                                                                                transition={{ type: "tween", ease: "easeInOut", duration: 0.2 }}
+                                                                                className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/50 rounded"
+                                                                                onClick={() => handleSell(holding)}>
+                                                                                <FontAwesomeIcon icon={faPen} /> Sell
+                                                                            </motion.button>
+                                                                        </MenuItem>
+                                                                    </MenuItems>
+                                                                </Transition>
+                                                            </Menu>
                                                         </td>
-
-                                                        {/* Current / Invested */}
-                                                        <td>
-                                                            <div className="flex item-centered gap-4">
-                                                                <div>
-                                                                    <div className="font-semibold text-white">
-                                                                        ${curValue.toLocaleString()}
-                                                                    </div>
-                                                                    <div className="text-xs text-slate-400">
-                                                                        ${invested.toLocaleString()}
-                                                                    </div>
-                                                                </div>
-                                                                {/* Action Menu */}
-                                                                <Menu
-                                                                    as="div"
-                                                                    className="relative flex inline-block w-6 flex justify-center bg-transparent"
-                                                                    onMouseEnter={() => {
-                                                                        setOpenMenu(holding.symbol);
-                                                                    }
-                                                                    }
-                                                                    onMouseLeave={() => {
-                                                                        setOpenMenu(null);
-                                                                    }
-                                                                    }
-                                                                >
-                                                                    <MenuButton
-                                                                        className={`rounded-lg p-1 transition-opacity duration-200 ${hoverRow === holding.symbol ? "opacity-100" : "opacity-0"
-                                                                            } hover:bg-gray-100`}
-                                                                    >
-                                                                        <MoreVert className="h-4 w-4 text-gray-700" />
-                                                                    </MenuButton>
-
-                                                                    <Transition
-                                                                        as={Fragment}
-                                                                        show={openMenu === holding.symbol}
-                                                                        enter="transition ease-out duration-200"
-                                                                        enterFrom="opacity-0 translate-y-2 scale-95"
-                                                                        enterTo="opacity-100 translate-y-0 scale-100"
-                                                                        leave="transition ease-in duration-150"
-                                                                        leaveFrom="opacity-100 translate-y-0 scale-100"
-                                                                        leaveTo="opacity-0 translate-y-2 scale-95"
-                                                                    >
-                                                                        <MenuItems
-                                                                            anchor="bottom end"
-                                                                            className="absolute right-0 mt-2 w-48 z-[9999] bg-slate-900/80 backdrop-blur-xl text-slate-300 border-2 border-slate-700 rounded-md shadow-lg origin-top-right"
-                                                                        >
-                                                                            <MenuItem>
-                                                                                <motion.button
-                                                                                    whileHover={{ scale: 1.02, fontWeight: 700 }}
-                                                                                    whileTap={{ scale: 0.95 }}
-                                                                                    transition={{ type: "tween", ease: "easeInOut", duration: 0.2 }}
-                                                                                    className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/50 rounded"
-                                                                                    onClick={() => handleBuy(stock)}
-                                                                                >
-                                                                                    <HiListBullet className="stroke-[1.4]" /> Buy
-                                                                                </motion.button>
-                                                                            </MenuItem>
-
-                                                                            <MenuItem>
-                                                                                <motion.button
-                                                                                    whileHover={{ scale: 1.02, fontWeight: 700 }}
-                                                                                    whileTap={{ scale: 0.95 }}
-                                                                                    transition={{ type: "tween", ease: "easeInOut", duration: 0.2 }}
-                                                                                    className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/50 rounded"
-                                                                                    onClick={() => handleSell(stock)}
-                                                                                >
-                                                                                    <FontAwesomeIcon icon={faPen} /> Sell
-                                                                                </motion.button>
-                                                                            </MenuItem>
-
-                                                                            <MenuItem>
-                                                                                <motion.button
-                                                                                    whileHover={{ scale: 1.02, fontWeight: 700 }}
-                                                                                    whileTap={{ scale: 0.95 }}
-                                                                                    transition={{ type: "tween", ease: "easeInOut", duration: 0.2 }}
-                                                                                    onClick={() => handleCancelClick(stock.name, stock.mode)}
-                                                                                    className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-slate-700/50 rounded"
-                                                                                >
-                                                                                    <FontAwesomeIcon icon={faTrash} /> Cancel Order
-                                                                                </motion.button>
-                                                                            </MenuItem>
-                                                                        </MenuItems>
-                                                                    </Transition>
-                                                                </Menu>
-                                                            </div>
-                                                        </td>
-
                                                     </motion.tr>
                                                 );
                                             })}
                                         </tbody>
-
                                     </table>
                                 </motion.div>
-
                             </motion.div>
                         )}
 
                         {/* Watchlist Tab */}
                         {activeTab === "watchlist" && (
-                            <motion.div
-                                key="watchlist"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.3 }}
-                                className="space-y-4"
-                            >
+                            <motion.div key="watchlist" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-4">
                                 <table className="w-full text-sm">
                                     <thead className="text-slate-400 border-b border-slate-700">
                                         <tr>
                                             <th className="text-left pb-3">Instrument</th>
-                                            <th className="text-left pb-3">Day Change</th>
-                                            <th className="text-left pb-3">Current (Invested)</th>
+                                            <th className="text-left pb-3">Added</th>
+                                            <th className="text-left pb-3">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {stocks
-                                            .filter(s => watchlistStocks.some(w => w.symbol === s.symbol))
-                                            .map((stock, index) => {
-                                                const dayChange = stock.change ?? 0;
-                                                const dayPositive = dayChange >= 0;
-                                                const dayPercent = stock.changesPercentage ?? 0;
-                                                const price = stock.price ?? 0;
+                                        {/* ✅ Direct from MongoDB — WatchlistSchema fields */}
+                                        {watchlistStocks.map((item, index) => (
+                                            <motion.tr key={item._id}
+                                                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: index * 0.05, ease: "easeInOut" }}
+                                                className="border-b border-slate-700/40"
+                                                onMouseEnter={() => setHoverRow(item._id)}
+                                                onMouseLeave={() => setHoverRow(null)}>
 
-                                                return (
-                                                    <motion.tr
-                                                        key={stock.symbol}
-                                                        initial={{ opacity: 0, x: -20 }}
-                                                        animate={{ opacity: 1, x: 0 }}
-                                                        transition={{ delay: index * 0.05, ease: "easeInOut" }}
-                                                        className="border-b border-slate-700/40"
-                                                        onMouseEnter={() => setHoverRow(stock.symbol)}
-                                                        onMouseLeave={() => setHoverRow(null)}
-                                                    >
-                                                        {/* Instrument */}
-                                                        <td
-                                                            className="px-4 py-3 cursor-pointer hover:text-blue-500"
-                                                            onClick={() => navigate(`/stock/${stock.symbol}`)}
-                                                        >
-                                                            <div className="font-semibold text-white">{stock.symbol}</div>
-                                                            <div className="text-xs text-slate-400">{stock.name}</div>
-                                                        </td>
+                                                {/* symbol, name — WatchlistSchema */}
+                                                <td className="px-4 py-3 cursor-pointer hover:text-blue-500"
+                                                    onClick={() => navigate(`/stock/${item.symbol}`)}>
+                                                    <div className="font-semibold text-white">{item.symbol}</div>
+                                                    <div className="text-xs text-slate-400">{item.name}</div>
+                                                </td>
 
-                                                        {/* Day Change */}
-                                                        <td className="px-4 py-3">
-                                                            <div className={dayPositive ? "text-green-400" : "text-red-400"}>
-                                                                {dayPositive ? "+" : ""}${dayChange.toFixed(2)}
-                                                            </div>
-                                                            <div className="text-xs text-slate-400">
-                                                                ({dayPercent.toFixed(2)}%)
-                                                            </div>
-                                                        </td>
+                                                {/* addedAt — WatchlistSchema */}
+                                                <td className="px-4 py-3 text-xs text-slate-400">
+                                                    {new Date(item.addedAt).toLocaleDateString()}
+                                                </td>
 
-                                                        {/* Price */}
-
-                                                        <td className="px-4 py-3">
-                                                            <div className="flex items-center justify-between">
-
-                                                                <span className="font-semibold text-white w-fit">
-                                                                    ${price.toFixed(2)}
-                                                                </span>
-
-
-                                                                {/* Actions */}
-                                                                <Menu
-                                                                    as="div"
-                                                                    className="relative flex inline-block w-6 flex justify-center bg-transparent"
-                                                                    onMouseEnter={() => setOpenMenu(stock.symbol)}
-                                                                    onMouseLeave={() => setOpenMenu(null)}
-                                                                >
-                                                                    <MenuButton
-                                                                        className={`rounded-lg p-1 transition-opacity duration-200 ${hoverRow === stock.symbol ? "opacity-100" : "opacity-0"
-                                                                            } hover:bg-gray-100`}
-                                                                    >
-                                                                        <MoreVert className="h-4 w-4 text-gray-700" />
-                                                                    </MenuButton>
-                                                                    <Transition
-                                                                        as={Fragment}
-                                                                        show={openMenu === stock.symbol}
-                                                                        enter="transition ease-out duration-200"
-                                                                        enterFrom="opacity-0 translate-y-2 scale-95"
-                                                                        enterTo="opacity-100 translate-y-0 scale-100"
-                                                                        leave="transition ease-in duration-150"
-                                                                        leaveFrom="opacity-100 translate-y-0 scale-100"
-                                                                        leaveTo="opacity-0 translate-y-2 scale-95"
-                                                                    >
-                                                                        <MenuItems
-                                                                            anchor="bottom end"
-                                                                            className="absolute right-0 mt-2 w-48 z-[9999] bg-slate-900/80 backdrop-blur-xl text-slate-300 border-2 border-slate-700 rounded-md shadow-lg origin-top-right"
-                                                                        >
-                                                                            <MenuItem>
-                                                                                <motion.button
-                                                                                    whileHover={{ fontWeight: 700 }}
-                                                                                    whileTap={{ scale: 0.95 }}
-                                                                                    onClick={() => navigate(`/stock/${stock.symbol}`)}
-                                                                                    className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/50 rounded"
-                                                                                >
-                                                                                    <HiListBullet /> View Details
-                                                                                </motion.button>
-                                                                            </MenuItem>
-                                                                            <MenuItem>
-                                                                                <motion.button
-                                                                                    whileHover={{ fontWeight: 700 }}
-                                                                                    whileTap={{ scale: 0.95 }}
-                                                                                    className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-slate-700/50 rounded"
-                                                                                >
-                                                                                    <FontAwesomeIcon icon={faTrash} /> Remove
-                                                                                </motion.button>
-                                                                            </MenuItem>
-                                                                        </MenuItems>
-                                                                    </Transition>
-                                                                </Menu>
-                                                            </div>
-                                                        </td>
-                                                    </motion.tr>
-                                                );
-                                            })
-                                        }
+                                                <td className="px-4 py-3">
+                                                    <Menu as="div" className="relative inline-block"
+                                                        onMouseEnter={() => setOpenMenu(item._id)}
+                                                        onMouseLeave={() => setOpenMenu(null)}>
+                                                        <MenuButton className={`rounded-lg p-1 transition-opacity duration-200 ${hoverRow === item._id ? "opacity-100" : "opacity-0"} hover:bg-gray-100`}>
+                                                            <MoreVert className="h-4 w-4 text-gray-700" />
+                                                        </MenuButton>
+                                                        <Transition as={Fragment} show={openMenu === item._id}
+                                                            enter="transition ease-out duration-200"
+                                                            enterFrom="opacity-0 translate-y-2 scale-95"
+                                                            enterTo="opacity-100 translate-y-0 scale-100"
+                                                            leave="transition ease-in duration-150"
+                                                            leaveFrom="opacity-100 translate-y-0 scale-100"
+                                                            leaveTo="opacity-0 translate-y-2 scale-95">
+                                                            <MenuItems anchor="bottom end"
+                                                                className="absolute right-0 mt-2 w-48 z-[9999] bg-slate-900/80 backdrop-blur-xl text-slate-300 border-2 border-slate-700 rounded-md shadow-lg origin-top-right">
+                                                                <MenuItem>
+                                                                    <motion.button whileHover={{ fontWeight: 700 }} whileTap={{ scale: 0.95 }}
+                                                                        onClick={() => navigate(`/stock/${item.symbol}`)}
+                                                                        className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/50 rounded">
+                                                                        <HiListBullet /> View Details
+                                                                    </motion.button>
+                                                                </MenuItem>
+                                                                <MenuItem>
+                                                                    <motion.button whileHover={{ fontWeight: 700 }} whileTap={{ scale: 0.95 }}
+                                                                        className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-slate-700/50 rounded">
+                                                                        <FontAwesomeIcon icon={faTrash} /> Remove
+                                                                    </motion.button>
+                                                                </MenuItem>
+                                                            </MenuItems>
+                                                        </Transition>
+                                                    </Menu>
+                                                </td>
+                                            </motion.tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </motion.div>
@@ -786,19 +445,13 @@ export default function StockDashboard() {
 
                         {/* Orders Tab */}
                         {activeTab === "orders" && (
-                            <motion.div
-                                key="orders"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.3 }}
-                                className=" rounde-2d-2xl shadow-md overflow-hidden border border-slate-700/50"
-                            >
+                            <motion.div key="orders" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}
+                                className="rounded-2xl shadow-md overflow-hidden border border-slate-700/50">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead className="bg-slate-900/50 border-b border-slate-700/50">
                                             <tr>
-                                                <th className="px-6 py-4 text-left font-semibold text-slate-300">Order ID</th>
                                                 <th className="px-6 py-4 text-left font-semibold text-slate-300">Stock</th>
                                                 <th className="px-6 py-4 text-left font-semibold text-slate-300">Type</th>
                                                 <th className="px-6 py-4 text-right font-semibold text-slate-300">Quantity</th>
@@ -810,41 +463,45 @@ export default function StockDashboard() {
                                         <tbody>
                                             {orders.map((order, index) => (
                                                 <motion.tr
-                                                    key={order.id}
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
+                                                    key={order._id}  // ✅ OrderSchema: _id
+                                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                                     transition={{ delay: index * 0.05 }}
-                                                    className="border-b border-slate-700/30 hover:bg-slate-700/30 transition-colors"
-                                                >
-                                                    <td className="px-6 py-4 font-mono text-sm text-slate-400">{order.id}</td>
+                                                    className="border-b border-slate-700/30 hover:bg-slate-700/30 transition-colors">
+
+                                                    {/* ✅ OrderSchema: symbol */}
                                                     <td className="px-6 py-4 font-semibold text-white">{order.symbol}</td>
+
+                                                    {/* ✅ OrderSchema: type — "BUY" | "SELL" */}
                                                     <td className="px-6 py-4">
-                                                        <span
-                                                            className={`px-3 py-1 rounded-full text-xs font-semibold ${order.type === "BUY"
-                                                                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                                                                : "bg-red-500/20 text-red-400 border border-red-500/30"
-                                                                }`}
-                                                        >
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${order.type === "BUY"
+                                                            ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                                                            : "bg-red-500/20 text-red-400 border border-red-500/30"}`}>
                                                             {order.type}
                                                         </span>
                                                     </td>
+
+                                                    {/* ✅ OrderSchema: quantity */}
                                                     <td className="px-6 py-4 text-right text-white">{order.quantity}</td>
-                                                    <td className="px-6 py-4 text-right font-semibold text-white">
-                                                        ${order.price}
-                                                    </td>
+
+                                                    {/* ✅ OrderSchema: price */}
+                                                    <td className="px-6 py-4 text-right font-semibold text-white">${order.price}</td>
+
+                                                    {/* ✅ OrderSchema: status — "EXECUTED" | "PENDING" | "CANCELLED" */}
                                                     <td className="px-6 py-4 text-center">
-                                                        <span
-                                                            className={`px-3 py-1 rounded-full text-xs font-semibold ${order.status === "Executed"
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${order.status === "EXECUTED"
                                                                 ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                                                                : order.status === "Pending"
+                                                                : order.status === "PENDING"
                                                                     ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
                                                                     : "bg-slate-700/50 text-slate-400 border border-slate-600/30"
-                                                                }`}
-                                                        >
+                                                            }`}>
                                                             {order.status}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-4 text-right text-sm text-slate-400">{order.time}</td>
+
+                                                    {/* ✅ OrderSchema: placedAt */}
+                                                    <td className="px-6 py-4 text-right text-sm text-slate-400">
+                                                        {new Date(order.placedAt).toLocaleString()}
+                                                    </td>
                                                 </motion.tr>
                                             ))}
                                         </tbody>
@@ -852,10 +509,10 @@ export default function StockDashboard() {
                                 </div>
                             </motion.div>
                         )}
+
                     </AnimatePresence>
                 </div>
             </div>
-        </div >
+        </div>
     );
 }
-
