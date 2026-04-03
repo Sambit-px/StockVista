@@ -51,50 +51,13 @@ app.get("/debug-twelve/:symbol", async (req, res) => {
 
 app.get("/stocks", authMiddleware, async (req, res) => {
   try {
-    const { symbols } = req.query;
+    const [holdings, watchlist, orders] = await Promise.all([
+      HoldingModel.find({ userId: req.userId }),
+      WatchlistModel.find({ userId: req.userId }),
+      OrderModel.find({ userId: req.userId }),
+    ]);
 
-    // Symbols coming from frontend
-    let querySymbols = [];
-    if (symbols) {
-      querySymbols = symbols.split(",").map(s => s.trim().toUpperCase());
-    }
-
-    // Get user data
-    const user = await UserModel.findById(req.userId);
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // Symbols stored in DB
-    const holdingSymbols = user.stocks?.holdings?.map(s => s.symbol) || [];
-    const watchlistSymbols = user.stocks?.watchlist?.map(s => s.symbol) || [];
-    const orderSymbols = user.stocks?.orders?.map(s => s.symbol) || [];
-
-    // Merge all symbols
-    const allSymbols = [
-      ...holdingSymbols,
-      ...watchlistSymbols,
-      ...orderSymbols
-    ];
-
-    // Remove duplicates
-    const uniqueSymbols = [...new Set(allSymbols)];
-
-    if (uniqueSymbols.length === 0) {
-      return res.json([]);
-    }
-
-    // Fetch stock data
-    const stocksData = await Promise.all(
-      uniqueSymbols.map(symbol => getStockQuote(symbol))
-    );
-
-    const holdingsData = stocksData.filter(s => holdingSymbols.includes(s.symbol));
-    const watchlistData = stocksData.filter(s => watchlistSymbols.includes(s.symbol));
-    const ordersData = stocksData.filter(s => orderSymbols.includes(s.symbol));
-
-    res.json({ holdings: holdingsData, watchlist: watchlistData, orders: ordersData });
+    res.json({ holdings, watchlist, orders });
 
   } catch (err) {
     console.error("Failed to fetch /stocks:", err);
