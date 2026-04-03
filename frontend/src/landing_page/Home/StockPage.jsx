@@ -136,6 +136,25 @@ export function StockPage() {
 
         return isPercent ? `${formatted}%` : formatted;
     }
+    // Add this function
+    const toggleWatchlist = async () => {
+        const token = localStorage.getItem("accessToken");
+        try {
+            if (isInWatchlist) {
+                await axios.delete(`${API}/watchlist/${stockData.symbol}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } else {
+                await axios.post(`${API}/watchlist`,
+                    { symbol: stockData.symbol, name: stockData.name },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            }
+            setIsInWatchlist(prev => !prev);
+        } catch (err) {
+            console.error("Watchlist toggle failed:", err.response?.data || err.message);
+        }
+    };
 
     const fetchStock = async () => {
         try {
@@ -283,6 +302,13 @@ export function StockPage() {
 
         // ✅ AFTER
         const loadBaseData = async () => {
+            const wlRes = await fetch(`${API}/watchlist/${symbol}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (wlRes.ok) {
+                const wlData = await wlRes.json();
+                setIsInWatchlist(wlData.isWatchlisted);
+            }
             setLoading(true);
             try {
                 const token = localStorage.getItem("accessToken");
@@ -555,7 +581,7 @@ export function StockPage() {
                                     ))}
                                 </div>
                                 <button
-                                    onClick={() => setIsInWatchlist(!isInWatchlist)}
+                                    onClick={() => toggleWatchlist}
                                     className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-gray-400 hover:text-white hover:bg-white/5 rounded transition-colors"
                                 >
                                     <Star className={`w-3.5 h-3.5 ${isInWatchlist ? "fill-emerald-500 text-emerald-500" : ""}`} />

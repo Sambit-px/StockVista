@@ -51,13 +51,50 @@ app.get("/debug-twelve/:symbol", async (req, res) => {
 
 app.get("/stocks", authMiddleware, async (req, res) => {
   try {
-    const [holdings, watchlist, orders] = await Promise.all([
-      HoldingModel.find({ userId: req.userId }),
-      WatchlistModel.find({ userId: req.userId }),
-      OrderModel.find({ userId: req.userId })
-    ]);
+    const { symbols } = req.query;
 
-    res.json({ holdings, watchlist, orders });
+    // Symbols coming from frontend
+    let querySymbols = [];
+    if (symbols) {
+      querySymbols = symbols.split(",").map(s => s.trim().toUpperCase());
+    }
+
+    // Get user data
+    const user = await UserModel.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Symbols stored in DB
+    const holdingSymbols = user.stocks?.holdings?.map(s => s.symbol) || [];
+    const watchlistSymbols = user.stocks?.watchlist?.map(s => s.symbol) || [];
+    const orderSymbols = user.stocks?.orders?.map(s => s.symbol) || [];
+
+    // Merge all symbols
+    const allSymbols = [
+      ...holdingSymbols,
+      ...watchlistSymbols,
+      ...orderSymbols
+    ];
+
+    // Remove duplicates
+    const uniqueSymbols = [...new Set(allSymbols)];
+
+    if (uniqueSymbols.length === 0) {
+      return res.json([]);
+    }
+
+    // Fetch stock data
+    const stocksData = await Promise.all(
+      uniqueSymbols.map(symbol => getStockQuote(symbol))
+    );
+
+    const holdingsData = stocksData.filter(s => holdingSymbols.includes(s.symbol));
+    const watchlistData = stocksData.filter(s => watchlistSymbols.includes(s.symbol));
+    const ordersData = stocksData.filter(s => orderSymbols.includes(s.symbol));
+
+    res.json({ holdings: holdingsData, watchlist: watchlistData, orders: ordersData });
 
   } catch (err) {
     console.error("Failed to fetch /stocks:", err);
@@ -384,6 +421,28 @@ app.post("/stock/:symbol/sell", authMiddleware, async (req, res) => {
     res.status(500).json({ error: "Sell failed" });
   }
 });
+
+// GET /watchlist/:symbol — check if watchlisted
+app.get("/watchlist/:symbol", authMiddleware, async (req, res) => {
+  const item = await WatchlistModel.findOne({ userId: req.userId, symbol: req.params.symbol.toUpperCase() });
+  res.json({ isWatchlisted: !!item });
+});
+
+// POST /watchlist — add to watchlist
+app.post("/watchlist", authMiddleware, async (req, res) => {
+  const { symbol, name } = req.body;
+  const existing = await WatchlistModel.findOne({ userId: req.userId, symbol: symbol.toUpperCase() });
+  if (existing) return res.json({ message: "Already in watchlist" });
+  await WatchlistModel.create({ userId: req.userId, symbol: symbol.toUpperCase(), name });
+  res.json({ message: "Added to watchlist" });
+});
+
+// DELETE /watchlist/:symbol — remove from watchlist
+app.delete("/watchlist/:symbol", authMiddleware, async (req, res) => {
+  await WatchlistModel.deleteOne({ userId: req.userId, symbol: req.params.symbol.toUpperCase() });
+  res.json({ message: "Removed from watchlist" });
+});
+
 
 app.listen(PORT, () => {
   console.log("App started!");
