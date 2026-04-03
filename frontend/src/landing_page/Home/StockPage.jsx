@@ -139,20 +139,26 @@ export function StockPage() {
     // Add this function
     const toggleWatchlist = async () => {
         const token = localStorage.getItem("accessToken");
+
+        const newState = !isInWatchlist;
+        setIsInWatchlist(newState);
+
         try {
-            if (isInWatchlist) {
-                await axios.delete(`${API}/watchlist/${stockData.symbol}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-            } else {
-                await axios.post(`${API}/watchlist`,
+            if (newState) {
+                await axios.post(
+                    `${API}/watchlist`,
                     { symbol: stockData.symbol, name: stockData.name },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
+            } else {
+                await axios.delete(
+                    `${API}/watchlist/${stockData.symbol}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
             }
-            setIsInWatchlist(prev => !prev);
         } catch (err) {
-            console.error("Watchlist toggle failed:", err.response?.data || err.message);
+            console.error("Watchlist toggle failed:", err);
+            setIsInWatchlist(prev => !prev); // ✅ safer rollback
         }
     };
 
@@ -309,6 +315,7 @@ export function StockPage() {
                 const wlRes = await fetch(`${API}/watchlist/${symbol}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+
                 if (wlRes.ok) {
                     const wlData = await wlRes.json();
                     setIsInWatchlist(wlData.isWatchlisted);
@@ -582,10 +589,13 @@ export function StockPage() {
                                     ))}
                                 </div>
                                 <button
-                                    onClick={() => toggleWatchlist}
+                                    onClick={toggleWatchlist}
                                     className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-gray-400 hover:text-white hover:bg-white/5 rounded transition-colors"
                                 >
-                                    <Star className={`w-3.5 h-3.5 ${isInWatchlist ? "fill-emerald-500 text-emerald-500" : ""}`} />
+                                    <Star
+                                        className={`w-3.5 h-3.5 ${isInWatchlist ? "fill-emerald-500 text-emerald-500" : ""
+                                            }`}
+                                    />
                                     {isInWatchlist ? "Watchlisted" : "Add to Watchlist"}
                                 </button>
                             </div>
