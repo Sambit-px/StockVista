@@ -567,7 +567,7 @@ export default function StockDashboard() {
 
                                                         {/* Instrument */}
                                                         <td
-                                                            className="px-4 py-3 cursor-pointer hover:text-blue-500 text-center"
+                                                            className="px-4 py-3 cursor-pointer text-center"
                                                             onClick={() => navigate(`/stock/${holding.symbol}`)}
                                                         >
                                                             <div className="font-semibold text-white">{holding.symbol}</div>
