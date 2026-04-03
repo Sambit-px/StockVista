@@ -302,16 +302,17 @@ export function StockPage() {
 
         // ✅ AFTER
         const loadBaseData = async () => {
-            const wlRes = await fetch(`${API}/watchlist/${symbol}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (wlRes.ok) {
-                const wlData = await wlRes.json();
-                setIsInWatchlist(wlData.isWatchlisted);
-            }
             setLoading(true);
             try {
                 const token = localStorage.getItem("accessToken");
+
+                const wlRes = await fetch(`${API}/watchlist/${symbol}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (wlRes.ok) {
+                    const wlData = await wlRes.json();
+                    setIsInWatchlist(wlData.isWatchlisted);
+                }
 
                 const [stockRes, fundamentalsRes, financialsRes, metricRes, fullFinancialsRes] = await Promise.all([
                     fetchStock(),
