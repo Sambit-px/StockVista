@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTrash, faXmark } from "@fortawesome/free-solid-svg-icons";
@@ -19,6 +19,8 @@ export function OrdersRowActions({
     const [editModal, setEditModal] = useState(false);
     const [cancelModal, setCancelModal] = useState(false);
     const [mode, setMode] = useState("EDIT");
+    const [dropUp, setDropUp] = useState(false);
+    const wrapperRef = useRef(null);
 
     const stockInfo = stocks.find((s) => s.symbol === order.symbol);
     const isPending = order.status === "PENDING";
@@ -83,13 +85,20 @@ export function OrdersRowActions({
         }
     };
 
-
+    const handleMouseEnter = () => {
+        if (wrapperRef.current) {
+            const rect = wrapperRef.current.getBoundingClientRect();
+            setDropUp(window.innerHeight - rect.bottom < 180);
+        }
+        setIsOpen(true);
+    };
 
     return (
         <>
             <div
+                ref={wrapperRef}
                 className="relative inline-block"
-                onMouseEnter={() => setIsOpen(true)}
+                onMouseEnter={handleMouseEnter}
                 onMouseLeave={() => setIsOpen(false)}
             >
                 <button
@@ -108,6 +117,9 @@ export function OrdersRowActions({
                             transition={{ duration: 0.15 }}
                             className="absolute right-0 mt-1 w-52 z-[9999] rounded-xl overflow-hidden"
                             style={{
+                                ...(dropUp
+                                    ? { bottom: "calc(100% + 4px)" }
+                                    : { top: "calc(100% + 4px)" }),
                                 background: "rgba(15,22,36,0.97)",
                                 backdropFilter: "blur(20px)",
                                 WebkitBackdropFilter: "blur(20px)",

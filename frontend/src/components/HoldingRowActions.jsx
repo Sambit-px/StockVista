@@ -1,5 +1,5 @@
 // components/HoldingsRowActions.jsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import toast from "react-hot-toast";
 import { MoreVert } from "@mui/icons-material";
@@ -9,16 +9,28 @@ import TradeModal from "./Trademodal.jsx";
 export function HoldingsRowActions({ holding, hoverRow, stocks, onTraded }) {
     const [isOpen, setIsOpen] = useState(false);
     const [tradeModal, setTradeModal] = useState({ open: false, mode: "BUY" });
+    const [dropUp, setDropUp] = useState(false);          // ← new
+    const wrapperRef = useRef(null);                       // ← new
 
     const stock = stocks.find(s => s.symbol === holding.symbol);
     const currentPrice = stock?.price ?? holding.avgPrice;
     const isBuy = tradeModal.mode === "BUY";
 
+    const handleMouseEnter = () => {
+        if (wrapperRef.current) {
+            const rect = wrapperRef.current.getBoundingClientRect();
+            // If less than 180px below the button, flip upward
+            setDropUp(window.innerHeight - rect.bottom < 180);
+        }
+        setIsOpen(true);
+    };
+
     return (
         <>
             <div
+                ref={wrapperRef}
                 className="relative inline-block"
-                onMouseEnter={() => setIsOpen(true)}
+                onMouseEnter={handleMouseEnter}
                 onMouseLeave={() => setIsOpen(false)}
             >
                 <button
@@ -31,12 +43,16 @@ export function HoldingsRowActions({ holding, hoverRow, stocks, onTraded }) {
                 <AnimatePresence>
                     {isOpen && (
                         <motion.div
-                            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                            initial={{ opacity: 0, y: dropUp ? -6 : 6, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                            exit={{ opacity: 0, y: dropUp ? -4 : 4, scale: 0.96 }}
                             transition={{ duration: 0.15 }}
-                            className="absolute right-0 mt-1 w-52 z-[9999] rounded-xl overflow-hidden"
+                            className="absolute right-0 w-52 z-[9999] rounded-xl overflow-hidden"
                             style={{
+                                // ← key change: anchor to bottom when flipping up
+                                ...(dropUp
+                                    ? { bottom: "calc(100% + 4px)" }
+                                    : { top: "calc(100% + 4px)" }),
                                 background: "rgba(15,22,36,0.97)",
                                 backdropFilter: "blur(20px)",
                                 WebkitBackdropFilter: "blur(20px)",
@@ -111,12 +127,9 @@ export function HoldingsRowActions({ holding, hoverRow, stocks, onTraded }) {
                 onConfirm={async ({ symbol, quantity, price, mode }) => {
                     const token = localStorage.getItem("accessToken");
                     const API = import.meta.env.VITE_API_URL;
-
                     const toastId = toast.loading(`${mode === "BUY" ? "Buying" : "Selling"} ${symbol}...`);
-
                     try {
                         const { default: axios } = await import("axios");
-
                         if (mode === "BUY") {
                             await axios.post(
                                 `${API}/stock/${symbol}/buy`,
@@ -130,17 +143,14 @@ export function HoldingsRowActions({ holding, hoverRow, stocks, onTraded }) {
                                 { headers: { Authorization: `Bearer ${token}` } }
                             );
                         }
-
                         toast.success(`${mode} order successful (${quantity} ${symbol})`, { id: toastId });
-
                         onTraded?.();
                     } catch (err) {
                         toast.error(
                             err?.response?.data?.message || err?.message || "Trade failed",
                             { id: toastId }
                         );
-
-                        throw err; // important so modal stops loading
+                        throw err;
                     }
                 }}
             />

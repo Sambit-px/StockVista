@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faBell, faBellSlash } from "@fortawesome/free-solid-svg-icons";
@@ -23,6 +23,8 @@ export function WatchlistRowActions({
     const [tradeModal, setTradeModal] = useState({ open: false, mode: "BUY" });
     const [alertModal, setAlertModal] = useState(false);
     const [alertActive, setAlertActive] = useState(false);
+    const [dropUp, setDropUp] = useState(false);
+    const wrapperRef = useRef(null);
 
     const existingHolding = holdings.find((h) => h.symbol === stock.symbol);
     const holding = existingHolding ?? {
@@ -92,13 +94,21 @@ export function WatchlistRowActions({
         toast.success("Price alert removed");
     };
 
+    const handleMouseEnter = () => {
+        if (wrapperRef.current) {
+            const rect = wrapperRef.current.getBoundingClientRect();
+            setDropUp(window.innerHeight - rect.bottom < 240); // 240 = taller menu
+        }
+        setIsOpen(true);
+    };
     const isPositive = (stock.changesPercentage ?? 0) >= 0;
 
     return (
         <>
             <div
+                ref={wrapperRef}
                 className="relative inline-block"
-                onMouseEnter={() => setIsOpen(true)}
+                onMouseEnter={handleMouseEnter}
                 onMouseLeave={() => setIsOpen(false)}
             >
                 <button
@@ -117,6 +127,9 @@ export function WatchlistRowActions({
                             transition={{ duration: 0.15 }}
                             className="absolute right-0 mt-1 w-56 z-[9999] rounded-xl overflow-hidden"
                             style={{
+                                ...(dropUp
+                                    ? { bottom: "calc(100% + 4px)" }
+                                    : { top: "calc(100% + 4px)" }),
                                 background: "rgba(15,22,36,0.97)",
                                 backdropFilter: "blur(20px)",
                                 WebkitBackdropFilter: "blur(20px)",
